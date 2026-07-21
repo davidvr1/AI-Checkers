@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p \"/c/Users/FB2B~1/AppData/Local/Temp/claude/c--Users-----Desktop-AI-AI-Checkers/c3e61866-4036-466f-b37f-050b2f1578ac/scratchpad\")",
+      "Bash(mkdir -p \"/c/Users/דוד/Desktop/AI/AI Checkers/docs/design\" && cp \"/c/Users/FB2B~1/AppData/Local/Temp/claude/c--Users-----Desktop-AI-AI-Checkers/c3e61866-4036-466f-b37f-050b2f1578ac/scratchpad/checkers-board-sketch.html\" \"/c/Users/דוד/Desktop/AI/AI Checkers/docs/design/board-sketch.html\" && ls -la \"/c/Users/דוד/Desktop/AI/AI Checkers/docs/design\")"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\FB2B~1\\AppData\\Local\\Temp\\claude\\c--Users-----Desktop-AI-AI-Checkers\\c3e61866-4036-466f-b37f-050b2f1578ac\\scratchpad"
+    ]
+  }
+}

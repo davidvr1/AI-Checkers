@@ -1,0 +1,435 @@
+<title>Checkers — Board Sketch</title>
+<style>
+  :root {
+    --moss: #3E4B32;
+    --moss-dark: #2E3826;
+    --buff: #E7DBB9;
+    --buff-line: #D6C89E;
+    --garnet: #8C2A2A;
+    --garnet-hi: #A5372F;
+    --ink: #201C17;
+    --ink-hi: #34302A;
+    --brass: #C4972B;
+    --brass-soft: #C4972B33;
+
+    --bg: #F1ECDF;
+    --panel: #FBF8F0;
+    --panel-border: #DDD3B8;
+    --text: #221E17;
+    --text-dim: #6B6252;
+    --rule: #D6C89E;
+  }
+
+  :root[data-theme="dark"] {
+    --bg: #15130F;
+    --panel: #1D1A14;
+    --panel-border: #35301F;
+    --text: #EDE6D6;
+    --text-dim: #A99C81;
+    --rule: #35301F;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #15130F;
+      --panel: #1D1A14;
+      --panel-border: #35301F;
+      --text: #EDE6D6;
+      --text-dim: #A99C81;
+      --rule: #35301F;
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    min-height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Segoe UI", -apple-system, "Helvetica Neue", Arial, sans-serif;
+  }
+
+  body {
+    padding: clamp(20px, 4vw, 56px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 28px;
+  }
+
+  .masthead {
+    text-align: center;
+    max-width: 640px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .eyebrow {
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--brass);
+    font-weight: 600;
+  }
+
+  h1 {
+    font-family: Georgia, "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+    font-size: clamp(28px, 4vw, 38px);
+    margin: 0;
+    text-wrap: balance;
+    letter-spacing: 0.01em;
+  }
+
+  .sub {
+    color: var(--text-dim);
+    font-size: 14.5px;
+    line-height: 1.5;
+    text-wrap: balance;
+  }
+
+  .program {
+    display: flex;
+    gap: 28px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  /* ---- Board: a fixed material, same in both themes ---- */
+  .board-card {
+    background: linear-gradient(180deg, #4a3826, #3a2c1d);
+    padding: 18px;
+    border-radius: 6px;
+    box-shadow:
+      0 1px 0 rgba(255,255,255,0.08) inset,
+      0 18px 40px -18px rgba(0,0,0,0.55),
+      0 2px 6px rgba(0,0,0,0.35);
+  }
+
+  .board {
+    display: grid;
+    grid-template-columns: repeat(8, min(9vw, 58px));
+    grid-template-rows: repeat(8, min(9vw, 58px));
+    border: 3px solid #2b2015;
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .sq {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .sq.light { background: var(--buff); }
+  .sq.dark { background: var(--moss); }
+
+  .sq.selected::before {
+    content: "";
+    position: absolute;
+    inset: 3px;
+    border: 2.5px solid var(--brass);
+    border-radius: 3px;
+  }
+
+  .sq .dot {
+    width: 22%;
+    height: 22%;
+    border-radius: 50%;
+    background: var(--brass);
+    opacity: 0.85;
+  }
+
+  .piece {
+    width: 78%;
+    height: 78%;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+
+  .piece.red {
+    background: radial-gradient(circle at 32% 28%, var(--garnet-hi), var(--garnet) 70%);
+    box-shadow: 0 2px 0 #5c1717, 0 3px 4px rgba(0,0,0,0.4);
+  }
+
+  .piece.black {
+    background: radial-gradient(circle at 32% 28%, var(--ink-hi), var(--ink) 70%);
+    box-shadow: 0 2px 0 #000, 0 3px 4px rgba(0,0,0,0.4);
+  }
+
+  .piece::after {
+    content: "";
+    position: absolute;
+    inset: 22%;
+    border-radius: 50%;
+    border: 1.5px solid rgba(255,255,255,0.16);
+  }
+
+  .piece.king .crown {
+    font-size: 13px;
+    color: var(--brass);
+    line-height: 1;
+    text-shadow: 0 1px 1px rgba(0,0,0,0.5);
+  }
+
+  /* ---- Scoreboard rail ---- */
+  .rail {
+    width: 240px;
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    padding: 18px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .turn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .turn .swatch {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 32% 28%, var(--garnet-hi), var(--garnet) 70%);
+    box-shadow: 0 1px 0 #5c1717;
+    flex-shrink: 0;
+  }
+
+  .turn-label {
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    display: block;
+  }
+
+  .turn-value {
+    font-family: Georgia, "Iowan Old Style", serif;
+    font-size: 19px;
+  }
+
+  hr.rule {
+    border: none;
+    border-top: 1px solid var(--rule);
+    margin: 0;
+    width: 100%;
+  }
+
+  .tally {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .tally-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 14px;
+  }
+
+  .tally-row .n {
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .tally-row .label {
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .tally-row .dot-key {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+
+  .dot-key.red { background: var(--garnet); }
+  .dot-key.black { background: var(--ink); }
+
+  .counter-note {
+    font-size: 12px;
+    color: var(--text-dim);
+    line-height: 1.5;
+  }
+
+  .legend {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12.5px;
+    color: var(--text-dim);
+  }
+
+  .legend-swatch {
+    width: 15px;
+    height: 15px;
+    border-radius: 3px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .legend-swatch.ring {
+    border: 2.5px solid var(--brass);
+    background: transparent;
+  }
+
+  .legend-swatch.moveto {
+    background: var(--buff);
+  }
+  .legend-swatch.moveto .inner {
+    width: 45%;
+    height: 45%;
+    border-radius: 50%;
+    background: var(--brass);
+  }
+
+  .legend-swatch.auto {
+    background: var(--brass-soft);
+    color: var(--brass);
+    font-size: 10px;
+    font-weight: 700;
+  }
+
+  footer {
+    max-width: 640px;
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 13px;
+    line-height: 1.6;
+    border-top: 1px dashed var(--rule);
+    padding-top: 16px;
+  }
+
+  footer strong { color: var(--text); }
+</style>
+
+<div class="masthead">
+  <span class="eyebrow">Design sketch — pre-development</span>
+  <h1>Checkers, on the web</h1>
+  <p class="sub">
+    Tournament-style green &amp; buff board, garnet vs. ink pieces, brass for anything interactive.
+    Starting position shown, with a selected piece, its legal moves, and a crowned king for scale.
+  </p>
+</div>
+
+<div class="program">
+  <div class="board-card">
+    <div class="board" id="board"></div>
+  </div>
+
+  <div class="rail">
+    <div class="turn">
+      <span class="swatch"></span>
+      <span>
+        <span class="turn-label">To move</span>
+        <span class="turn-value">Red</span>
+      </span>
+    </div>
+
+    <hr class="rule" />
+
+    <div class="tally">
+      <div class="tally-row">
+        <span class="label"><span class="dot-key red"></span>Red captured</span>
+        <span class="n">0</span>
+      </div>
+      <div class="tally-row">
+        <span class="label"><span class="dot-key black"></span>Black captured</span>
+        <span class="n">3</span>
+      </div>
+      <div class="tally-row">
+        <span class="label">Turns since capture</span>
+        <span class="n">6 / 40</span>
+      </div>
+    </div>
+
+    <hr class="rule" />
+
+    <div class="legend">
+      <div class="legend-item"><span class="legend-swatch ring"></span> Selected piece</div>
+      <div class="legend-item"><span class="legend-swatch moveto"><span class="inner"></span></span> Legal destination</div>
+      <div class="legend-item"><span class="legend-swatch auto">1</span> Auto-played when it's the only legal move</div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <strong>What's fixed:</strong> board colors, piece style, and the brass accent for anything clickable.
+  <strong>What's still open:</strong> exact rail wording and whether captured pieces render as a strip of discs instead of a number.
+</footer>
+
+<script>
+  // 0 = light square, 1 = dark square, standard alternating pattern
+  var board = document.getElementById('board');
+  var start = {
+    // row -> {col: 'red'|'black'|'redking'|'blackking'}
+    0: {1:'black',3:'black',5:'black',7:'black'},
+    1: {0:'black',2:'black',4:'black',6:'black'},
+    2: {1:'black',3:'black',5:'black',7:'black'},
+    5: {0:'red',2:'red',4:'red',6:'red'},
+    6: {1:'red',3:'red',5:'red',7:'red'},
+    7: {0:'red',2:'red',4:'redking',6:'red'}
+  };
+  var selected = { row: 5, col: 4 };
+  var moves = [ {row:4,col:3}, {row:4,col:5} ];
+
+  function isMove(r, c) {
+    return moves.some(function (m) { return m.row === r && m.col === c; });
+  }
+
+  for (var r = 0; r < 8; r++) {
+    for (var c = 0; c < 8; c++) {
+      var isDark = (r + c) % 2 === 1;
+      var sq = document.createElement('div');
+      sq.className = 'sq ' + (isDark ? 'dark' : 'light');
+
+      if (selected.row === r && selected.col === c) sq.className += ' selected';
+
+      var rowPieces = start[r];
+      var occ = rowPieces ? rowPieces[c] : undefined;
+
+      if (occ) {
+        var piece = document.createElement('div');
+        var isKing = occ.indexOf('king') !== -1;
+        var color = occ.indexOf('red') !== -1 ? 'red' : 'black';
+        piece.className = 'piece ' + color + (isKing ? ' king' : '');
+        if (isKing) {
+          var crown = document.createElement('span');
+          crown.className = 'crown';
+          crown.textContent = '♛';
+          piece.appendChild(crown);
+        }
+        sq.appendChild(piece);
+      } else if (isDark && isMove(r, c)) {
+        var dot = document.createElement('div');
+        dot.className = 'dot';
+        sq.appendChild(dot);
+      }
+
+      board.appendChild(sq);
+    }
+  }
+</script>
