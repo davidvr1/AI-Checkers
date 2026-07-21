@@ -1,15 +1,16 @@
+import { capitalize } from '../format';
 import { DRAW_TURN_LIMIT } from '../game/gameReducer';
 import type { GameState } from '../game/types';
 
 interface StatusBarProps {
   state: GameState;
+  /** e.g. "vs Human" or "vs AI · Medium" -- shown above the turn indicator. */
+  opponentLabel?: string;
+  /** True while the AI is computing its move for the current turn. */
+  aiThinking?: boolean;
 }
 
-function capitalize(word: string): string {
-  return word.charAt(0).toUpperCase() + word.slice(1);
-}
-
-export function StatusBar({ state }: StatusBarProps) {
+export function StatusBar({ state, opponentLabel, aiThinking }: StatusBarProps) {
   const { status, currentPlayer, capturedCount, turnsSinceCapture } = state;
 
   let swatchClass: 'red' | 'black' | 'neutral' = currentPlayer;
@@ -24,12 +25,17 @@ export function StatusBar({ state }: StatusBarProps) {
     swatchClass = 'neutral';
     turnLabel = 'Game over';
     turnValue = 'Draw';
+  } else if (aiThinking) {
+    turnLabel = 'AI is thinking';
+    turnValue = `${capitalize(currentPlayer)}…`;
   }
 
   return (
     <div className="rail">
+      {opponentLabel && <div className="opponent-label">{opponentLabel}</div>}
+
       <div className="turn">
-        <span className={`swatch ${swatchClass}`} />
+        <span className={`swatch ${swatchClass}${aiThinking ? ' thinking' : ''}`} />
         <span>
           <span className="turn-label">{turnLabel}</span>
           <span className="turn-value">{turnValue}</span>

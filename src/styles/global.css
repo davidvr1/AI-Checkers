@@ -59,6 +59,28 @@ h1 {
   text-wrap: balance;
 }
 
+.new-game {
+  align-self: center;
+  margin-top: var(--space-xs);
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--brass);
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  cursor: pointer;
+  transition: text-decoration-color 120ms ease, color 120ms ease;
+}
+
+.new-game:hover {
+  text-decoration-color: currentColor;
+  color: var(--garnet);
+}
+
 .program {
   display: flex;
   gap: var(--space-xl);
@@ -97,6 +119,14 @@ h1 {
 
 .sq.dark {
   cursor: pointer;
+}
+
+.board.disabled {
+  cursor: not-allowed;
+}
+
+.board.disabled .sq.dark {
+  cursor: not-allowed;
 }
 
 .sq.light {
@@ -169,6 +199,13 @@ h1 {
   gap: var(--space-md);
 }
 
+.opponent-label {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
 .turn {
   display: flex;
   align-items: center;
@@ -195,6 +232,20 @@ h1 {
 .turn .swatch.neutral {
   background: var(--text-dim);
   box-shadow: none;
+}
+
+.turn .swatch.thinking {
+  animation: pulse 1.1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
 }
 
 .turn-label {
@@ -301,4 +352,85 @@ hr.rule {
   color: var(--brass);
   font-size: 10px;
   font-weight: 700;
+}
+
+/* ---- Pre-game setup screen ---- */
+.setup {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-xl);
+}
+
+.setup-card {
+  width: min(420px, 90vw);
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg) var(--space-xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.setup-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.setup-label {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.setup-options {
+  display: flex;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.setup-option {
+  flex: 1;
+  min-width: 84px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--panel-border);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+  transition: border-color 120ms ease, color 120ms ease, background-color 120ms ease;
+}
+
+.setup-option:hover {
+  border-color: var(--brass);
+}
+
+.setup-option.active {
+  border-color: var(--brass);
+  color: var(--brass);
+  background: var(--brass-soft);
+  font-weight: 600;
+}
+
+.setup-start {
+  margin-top: var(--space-xs);
+  padding: 12px 18px;
+  border-radius: var(--radius-md);
+  border: none;
+  background: var(--brass);
+  color: var(--ink);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: filter 120ms ease;
+}
+
+.setup-start:hover {
+  filter: brightness(1.08);
 }

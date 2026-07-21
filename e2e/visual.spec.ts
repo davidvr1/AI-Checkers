@@ -55,8 +55,20 @@ const inkHi = extractColorVar('ink-hi');
 const brass = extractColorVar('brass');
 const headingFontStack = extractFontFamily('h1');
 
-test('board square colors match the sketch tokens', async ({ page }) => {
+/**
+ * The app now opens on a pre-game setup screen (vs Human / vs AI) rather than the
+ * board directly. These visual-fidelity checks are about the in-game board/rail,
+ * so every test starts by clicking through the default "vs Human" flow to reach it
+ * -- everything else below is unchanged from before the setup screen existed.
+ */
+async function startHumanGame(page: import('@playwright/test').Page): Promise<void> {
   await page.goto('/');
+  await page.getByRole('button', { name: 'vs Human', exact: true }).click();
+  await page.getByRole('button', { name: 'Start Game' }).click();
+}
+
+test('board square colors match the sketch tokens', async ({ page }) => {
+  await startHumanGame(page);
 
   const darkSquare = page.locator('.sq.dark').first();
   const lightSquare = page.locator('.sq.light').first();
@@ -66,7 +78,7 @@ test('board square colors match the sketch tokens', async ({ page }) => {
 });
 
 test('piece colors match the sketch garnet/ink tokens', async ({ page }) => {
-  await page.goto('/');
+  await startHumanGame(page);
 
   const redPiece = page.locator('.piece.red').first();
   const blackPiece = page.locator('.piece.black').first();
@@ -81,7 +93,7 @@ test('piece colors match the sketch garnet/ink tokens', async ({ page }) => {
 });
 
 test('brass accent is used for the live selection ring and the legend', async ({ page }) => {
-  await page.goto('/');
+  await startHumanGame(page);
 
   // Legend swatch: static reference to the brass accent.
   const ringSwatch = page.locator('.legend-swatch.ring');
@@ -106,7 +118,7 @@ test('brass accent is used for the live selection ring and the legend', async ({
 });
 
 test('display heading uses the sketch font stack', async ({ page }) => {
-  await page.goto('/');
+  await startHumanGame(page);
 
   const [firstFamily, lastFamily] = firstAndLastFamily(headingFontStack);
   const computedFontFamily = await page.locator('h1').evaluate((el) => getComputedStyle(el).fontFamily);
@@ -116,6 +128,6 @@ test('display heading uses the sketch font stack', async ({ page }) => {
 });
 
 test('full-page screenshot for manual comparison against the sketch', async ({ page }) => {
-  await page.goto('/');
+  await startHumanGame(page);
   await page.screenshot({ path: 'e2e/screenshots/app.png', fullPage: true });
 });
