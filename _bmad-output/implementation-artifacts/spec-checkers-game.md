@@ -2,9 +2,10 @@
 title: 'Playable Checkers Game (Human vs Human)'
 type: 'feature'
 created: '2026-07-21'
-status: 'ready-for-dev'
+status: 'done'
 review_loop_iteration: 0
 context: ['{project-root}/docs/design/board-sketch.html']
+baseline_commit: 'b3959074430eaf24cd9122671c2d9908942e5fc1'
 ---
 
 <frozen-after-approval reason="human-owned intent — do not modify unless human renegotiates">
@@ -70,17 +71,17 @@ context: ['{project-root}/docs/design/board-sketch.html']
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `package.json`, `vite.config.ts`, `tsconfig.json`, `index.html` -- scaffold a Vite + React + TypeScript project, add Playwright as a dev dependency -- establishes the runnable app shell and the visual-check tooling
-- [ ] `src/styles/tokens.css` -- transcribe the palette (moss/buff/garnet/ink/brass + light/dark neutrals), font stacks, and spacing used in `docs/design/board-sketch.html` into CSS custom properties -- single source of design truth for every component
-- [ ] `src/game/types.ts` -- define `Piece`, `Position`, `Board`, `Move`, `GameState` types -- shared vocabulary for the rules engine and UI
-- [ ] `src/game/board.ts` -- implement initial board layout and board helpers (get/set square, enumerate own pieces) -- isolates board representation from rules logic
-- [ ] `src/game/rules.ts` -- implement legal-move generation, mandatory-capture enforcement, multi-jump chaining, promotion, and win/draw detection per the Edge-Case Matrix -- the core game logic
-- [ ] `src/game/gameReducer.ts` -- implement a reducer with a single `applyMove(state, move)` entry point that turns moves into board updates using `rules.ts`, tracking turn, in-progress multi-jump piece, and no-capture turn counter; after every state change, check `rules.ts` for an exactly-one-legal-move case and auto-invoke `applyMove` again if so -- single source of truth for game state transitions, and the seam a future AI/network move source will call into
-- [ ] `src/components/Piece.tsx`, `src/components/Square.tsx`, `src/components/Board.tsx` -- render the board and pieces, wire clicks to the reducer -- visual + interaction layer
-- [ ] `src/components/StatusBar.tsx` -- display whose turn it is, or the win/draw result -- surfaces game-end state to players
-- [ ] `src/App.tsx`, `src/main.tsx` -- wire reducer, Board, and StatusBar into a running app -- final integration
-- [ ] `src/game/rules.test.ts` -- unit tests for every row of the I/O & Edge-Case Matrix -- locks in rules correctness
-- [ ] `e2e/visual.spec.ts` -- Playwright test loading the running app and asserting computed styles (board square colors, piece colors, brass accent, rail typography) match the tokens in `docs/design/board-sketch.html`; capture a screenshot -- the implementer's own proof the look-and-feel requirement was met, run before marking the spec done
+- [x] `package.json`, `vite.config.ts`, `tsconfig.json`, `index.html` -- scaffold a Vite + React + TypeScript project, add Playwright as a dev dependency -- establishes the runnable app shell and the visual-check tooling
+- [x] `src/styles/tokens.css` -- transcribe the palette (moss/buff/garnet/ink/brass + light/dark neutrals), font stacks, and spacing used in `docs/design/board-sketch.html` into CSS custom properties -- single source of design truth for every component
+- [x] `src/game/types.ts` -- define `Piece`, `Position`, `Board`, `Move`, `GameState` types -- shared vocabulary for the rules engine and UI
+- [x] `src/game/board.ts` -- implement initial board layout and board helpers (get/set square, enumerate own pieces) -- isolates board representation from rules logic
+- [x] `src/game/rules.ts` -- implement legal-move generation, mandatory-capture enforcement, multi-jump chaining, promotion, and win/draw detection per the Edge-Case Matrix -- the core game logic
+- [x] `src/game/gameReducer.ts` -- implement a reducer with a single `applyMove(state, move)` entry point that turns moves into board updates using `rules.ts`, tracking turn, in-progress multi-jump piece, and no-capture turn counter; after every state change, check `rules.ts` for an exactly-one-legal-move case and auto-invoke `applyMove` again if so -- single source of truth for game state transitions, and the seam a future AI/network move source will call into
+- [x] `src/components/Piece.tsx`, `src/components/Square.tsx`, `src/components/Board.tsx` -- render the board and pieces, wire clicks to the reducer -- visual + interaction layer
+- [x] `src/components/StatusBar.tsx` -- display whose turn it is, or the win/draw result -- surfaces game-end state to players
+- [x] `src/App.tsx`, `src/main.tsx` -- wire reducer, Board, and StatusBar into a running app -- final integration
+- [x] `src/game/rules.test.ts` -- unit tests for every row of the I/O & Edge-Case Matrix -- locks in rules correctness
+- [x] `e2e/visual.spec.ts` -- Playwright test loading the running app and asserting computed styles (board square colors, piece colors, brass accent, rail typography) match the tokens in `docs/design/board-sketch.html`; capture a screenshot -- the implementer's own proof the look-and-feel requirement was met, run before marking the spec done
 
 **Acceptance Criteria:**
 - Given the app just loaded, when the board renders, then it shows the standard 12-vs-12 starting position with the correct starting player indicated.
@@ -104,3 +105,45 @@ Extensibility seam: the reducer's only way to change the board is `applyMove(sta
 
 **Manual checks (if no CLI):**
 - `npm run dev`, open the app, and play a full game through to a win and (separately) verify the draw path is reachable in code review of the counter logic.
+
+## Suggested Review Order
+
+**Rules engine (core game logic)**
+
+- Entry point: mandatory captures now check all 4 diagonals, not just a piece's forward directions -- fixes a real rules bug (men couldn't capture backward).
+  [`rules.ts:54`](../../src/game/rules.ts#L54)
+- `applyMoveToBoard` now validates bounds/occupancy/capture-ownership before mutating -- the AI/network extensibility seam had zero input validation.
+  [`rules.ts:89`](../../src/game/rules.ts#L89)
+
+**Reducer (state machine)**
+
+- `applyMove` is the single seam every move flows through; continuation/auto-play/win-draw logic lives here.
+  [`gameReducer.ts:25`](../../src/game/gameReducer.ts#L25)
+- `handleSelectSquare` now bounds-checks `position` before indexing the board.
+  [`gameReducer.ts:96`](../../src/game/gameReducer.ts#L96)
+
+**Design fidelity**
+
+- Tokens transcribed from the approved sketch; every component styles through these custom properties.
+  [`tokens.css:1`](../../src/styles/tokens.css#L1)
+- Playwright reads `docs/design/board-sketch.html`'s own CSS variables at runtime and asserts the live app matches them -- not a hardcoded copy.
+  [`visual.spec.ts:1`](../../e2e/visual.spec.ts#L1)
+
+**Components**
+
+- `Square` is now keyboard-operable (`role="button"`, Enter/Space) -- it was the only interactive element in the app and had no non-mouse path.
+  [`Square.tsx:17`](../../src/components/Square.tsx#L17)
+- `Board`'s destination highlighting is the single source both the UI and the mandatory-capture rule share -- no duplicated move logic.
+  [`Board.tsx:15`](../../src/components/Board.tsx#L15)
+
+**Tests**
+
+- New coverage for backward captures, promotion mid-chain-as-king, and post-game-over lockout.
+  [`rules.test.ts:99`](../../src/game/rules.test.ts#L99)
+
+**Peripherals**
+
+- `reuseExistingServer` now respects `CI` to avoid a stale-server footgun.
+  [`playwright.config.ts:10`](../../playwright.config.ts#L10)
+- `@types/node` re-pinned off an outlier major version.
+  [`package.json:19`](../../package.json#L19)
