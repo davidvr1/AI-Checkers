@@ -79,6 +79,15 @@ export function currentLegalMoves(state: GameState): Move[] {
   return getAllLegalMoves(state.board, state.currentPlayer);
 }
 
+function sameMove(a: Move, b: Move): boolean {
+  return (
+    samePosition(a.from, b.from) &&
+    samePosition(a.to, b.to) &&
+    (a.captured === undefined) === (b.captured === undefined) &&
+    (a.captured === undefined || samePosition(a.captured, b.captured!))
+  );
+}
+
 /**
  * Repeatedly auto-plays the sole legal move whenever the player to move (or an
  * in-progress multi-jump) has exactly one legal move/continuation available.
@@ -132,6 +141,11 @@ export function gameReducer(state: GameState, action: Action): GameState {
   switch (action.type) {
     case 'SELECT_SQUARE':
       return handleSelectSquare(state, action.position);
+    case 'PLAY_MOVE': {
+      if (state.status.type !== 'in-progress') return state;
+      const legalMove = currentLegalMoves(state).find((m) => sameMove(m, action.move));
+      return legalMove ? withAutoPlay(applyMove(state, legalMove)) : state;
+    }
     default:
       return state;
   }

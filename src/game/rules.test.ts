@@ -214,6 +214,42 @@ describe('draw threshold', () => {
   });
 });
 
+// --- PLAY_MOVE legality (the AI/network move-source seam) ----------------------
+describe('PLAY_MOVE', () => {
+  it('applies a move that is actually legal for the player to move', () => {
+    const state = baseState(createInitialBoard());
+    const legalMove = { from: { row: 5, col: 2 }, to: { row: 4, col: 1 } };
+    const next = gameReducer(state, { type: 'PLAY_MOVE', move: legalMove });
+    expect(next.board[4][1]).toEqual({ color: 'red', kind: 'man' });
+    expect(next.currentPlayer).toBe('black');
+  });
+
+  it('ignores a move that is not in the current legal-move set instead of crashing', () => {
+    const state = baseState(createInitialBoard());
+    // Not a legal move: nothing at (0,0) to move, and (0,1) is occupied by black.
+    const illegalMove = { from: { row: 0, col: 0 }, to: { row: 0, col: 1 } };
+    const next = gameReducer(state, { type: 'PLAY_MOVE', move: illegalMove });
+    expect(next).toBe(state);
+  });
+
+  it('ignores a move for the wrong piece during a forced multi-jump continuation', () => {
+    let board = createEmptyBoard();
+    board = place(board, { row: 4, col: 4 }, 'red', 'king');
+    board = place(board, { row: 3, col: 3 }, 'black');
+    board = place(board, { row: 3, col: 5 }, 'black');
+    board = place(board, { row: 1, col: 1 }, 'black');
+    board = place(board, { row: 1, col: 3 }, 'black');
+
+    let state = baseState(board);
+    state = gameReducer(state, { type: 'PLAY_MOVE', move: { from: { row: 4, col: 4 }, to: { row: 2, col: 2 }, captured: { row: 3, col: 3 } } });
+    expect(state.mustContinueFrom).toEqual({ row: 2, col: 2 });
+
+    // A different piece, or a move not among the forced continuations, is a no-op.
+    const attempted = gameReducer(state, { type: 'PLAY_MOVE', move: { from: { row: 4, col: 4 }, to: { row: 5, col: 5 } } });
+    expect(attempted).toBe(state);
+  });
+});
+
 // --- No-op click ---------------------------------------------------------------
 describe('no-op click', () => {
   it('does not change state when clicking an empty square with nothing selected', () => {

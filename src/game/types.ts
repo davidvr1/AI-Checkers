@@ -46,4 +46,13 @@ export interface GameState {
   status: GameStatus;
 }
 
-export type Action = { type: 'SELECT_SQUARE'; position: Position };
+export type GameMode = 'human' | 'ai';
+export type Difficulty = 'easy' | 'medium' | 'hard';
+
+export type GameConfig =
+  | { mode: 'human' }
+  | { mode: 'ai'; humanColor: PieceColor; difficulty: Difficulty };
+
+export type Action =
+  | { type: 'SELECT_SQUARE'; position: Position }
+  | { type: 'PLAY_MOVE'; move: Move };

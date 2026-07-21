@@ -6,24 +6,30 @@ interface SquareProps {
   piece: PieceModel | null;
   isSelected: boolean;
   isLegalDestination: boolean;
+  disabled?: boolean;
   onClick: () => void;
 }
 
-export function Square({ isDark, piece, isSelected, isLegalDestination, onClick }: SquareProps) {
+export function Square({ isDark, piece, isSelected, isLegalDestination, disabled, onClick }: SquareProps) {
   const classes = ['sq', isDark ? 'dark' : 'light', isSelected ? 'selected' : '']
     .filter(Boolean)
     .join(' ');
+
+  const activate = () => {
+    if (disabled) return;
+    onClick();
+  };
 
   return (
     <div
       className={classes}
       role="button"
       tabIndex={0}
-      onClick={onClick}
+      onClick={activate}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
-          onClick();
+          activate();
         }
       }}
     >
