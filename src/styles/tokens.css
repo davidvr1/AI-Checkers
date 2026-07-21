@@ -1,0 +1,69 @@
+/*
+ * Design tokens transcribed from docs/design/board-sketch.html.
+ * This is the single source of design truth: components style through
+ * these custom properties rather than hardcoding colors or fonts.
+ */
+
+:root {
+  /* Board & piece palette */
+  --moss: #3e4b32;
+  --moss-dark: #2e3826;
+  --buff: #e7dbb9;
+  --buff-line: #d6c89e;
+  --garnet: #8c2a2a;
+  --garnet-hi: #a5372f;
+  --ink: #201c17;
+  --ink-hi: #34302a;
+  --brass: #c4972b;
+  --brass-soft: #c4972b33;
+
+  /* Light neutrals (default theme) */
+  --bg: #f1ecdf;
+  --panel: #fbf8f0;
+  --panel-border: #ddd3b8;
+  --text: #221e17;
+  --text-dim: #6b6252;
+  --rule: #d6c89e;
+
+  /* Board-card wood frame + piece bevel shadows (fixed material, both themes) */
+  --wood-start: #4a3826;
+  --wood-end: #3a2c1d;
+  --board-border: #2b2015;
+  --piece-red-shadow: #5c1717;
+  --piece-black-shadow: #000000;
+
+  /* Typography */
+  --font-display: Georgia, 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', serif;
+  --font-ui: 'Segoe UI', -apple-system, 'Helvetica Neue', Arial, sans-serif;
+
+  /* Spacing & radii */
+  --space-xs: 6px;
+  --space-sm: 10px;
+  --space-md: 16px;
+  --space-lg: 20px;
+  --space-xl: 28px;
+
+  --radius-sm: 2px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+}
+
+:root[data-theme='dark'] {
+  --bg: #15130f;
+  --panel: #1d1a14;
+  --panel-border: #35301f;
+  --text: #ede6d6;
+  --text-dim: #a99c81;
+  --rule: #35301f;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: #15130f;
+    --panel: #1d1a14;
+    --panel-border: #35301f;
+    --text: #ede6d6;
+    --text-dim: #a99c81;
+    --rule: #35301f;
+  }
+}
