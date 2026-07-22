@@ -18,25 +18,42 @@ function forwardRow(color: PieceColor): number {
   return color === 'red' ? -1 : 1;
 }
 
-function directionsFor(piece: Piece): Direction[] {
-  if (piece.kind === 'king') return ALL_DIRECTIONS;
-  const forward = forwardRow(piece.color);
-  return [
-    { row: forward, col: -1 },
-    { row: forward, col: 1 },
-  ];
-}
-
 function step(pos: Position, dir: Direction, scale = 1): Position {
   return { row: pos.row + dir.row * scale, col: pos.col + dir.col * scale };
 }
 
-/** Non-capturing single-step diagonal moves for the piece at `pos`, if any. */
+/**
+ * Walks `dir` starting one square beyond `from` (not including `from` itself),
+ * collecting consecutive empty squares until the board edge or an occupied
+ * square is reached. `blocker` is that occupied square, or null at the edge.
+ */
+function scanRay(board: Board, from: Position, dir: Direction): { empties: Position[]; blocker: Position | null } {
+  const empties: Position[] = [];
+  let pos = step(from, dir);
+  while (isOnBoard(pos) && getPiece(board, pos) === null) {
+    empties.push(pos);
+    pos = step(pos, dir);
+  }
+  return { empties, blocker: isOnBoard(pos) ? pos : null };
+}
+
+/**
+ * Non-capturing moves for the piece at `pos`. Men step exactly one square
+ * diagonally forward. Kings are "flying kings" (Israeli/international draughts
+ * house rule): they slide any distance in any of the 4 diagonal directions,
+ * stopping at the board edge or the first occupied square.
+ */
 export function pieceSimpleMoves(board: Board, pos: Position): Move[] {
   const piece = getPiece(board, pos);
   if (!piece) return [];
+
+  if (piece.kind === 'king') {
+    return ALL_DIRECTIONS.flatMap((dir) => scanRay(board, pos, dir).empties.map((to) => ({ from: pos, to })));
+  }
+
+  const forward = forwardRow(piece.color);
   const moves: Move[] = [];
-  for (const dir of directionsFor(piece)) {
+  for (const dir of [{ row: forward, col: -1 }, { row: forward, col: 1 }]) {
     const to = step(pos, dir);
     if (isOnBoard(to) && getPiece(board, to) === null) {
       moves.push({ from: pos, to });
@@ -47,22 +64,44 @@ export function pieceSimpleMoves(board: Board, pos: Position): Move[] {
 
 /**
  * Single-jump capture moves for the piece at `pos`, belonging to `player`.
- * Men are forward-only for simple moves, but standard draughts rules let a man
- * capture in any diagonal direction (including backward) -- only kings' simple
- * moves and captures share the same all-directions set.
+ *
+ * Men may capture in any diagonal direction (including backward) by jumping one
+ * adjacent enemy piece -- except a man may only capture an enemy KING by jumping
+ * forward; capturing an enemy man is unrestricted (house rule: "a man can indeed
+ * capture a king, but only advancing").
+ *
+ * Kings are "flying kings": along a clear diagonal, a king may jump the first
+ * enemy piece it meets and land on *any* empty square beyond it (up to the next
+ * occupied square or the edge) -- so one capturing king position can have
+ * several landing options for the same captured piece.
  */
 export function pieceCaptureMoves(board: Board, pos: Position, player: PieceColor): Move[] {
   const piece = getPiece(board, pos);
   if (!piece || piece.color !== player) return [];
+
+  if (piece.kind === 'king') {
+    const moves: Move[] = [];
+    for (const dir of ALL_DIRECTIONS) {
+      const { blocker } = scanRay(board, pos, dir);
+      if (!blocker) continue;
+      const blockerPiece = getPiece(board, blocker);
+      if (!blockerPiece || blockerPiece.color === player) continue;
+      for (const to of scanRay(board, blocker, dir).empties) {
+        moves.push({ from: pos, to, captured: blocker });
+      }
+    }
+    return moves;
+  }
+
   const moves: Move[] = [];
   for (const dir of ALL_DIRECTIONS) {
     const mid = step(pos, dir);
     const to = step(pos, dir, 2);
     if (!isOnBoard(to)) continue;
     const midPiece = getPiece(board, mid);
-    if (midPiece && midPiece.color !== player && getPiece(board, to) === null) {
-      moves.push({ from: pos, to, captured: mid });
-    }
+    if (!midPiece || midPiece.color === player || getPiece(board, to) !== null) continue;
+    if (midPiece.kind === 'king' && dir.row !== forwardRow(player)) continue;
+    moves.push({ from: pos, to, captured: mid });
   }
   return moves;
 }
@@ -80,6 +119,34 @@ export function getAllLegalMoves(board: Board, player: PieceColor): Move[] {
 
 export function hasAnyLegalMove(board: Board, player: PieceColor): boolean {
   return getAllLegalMoves(board, player).length > 0;
+}
+
+/**
+ * True for the one unambiguously drawn material configuration: exactly one king
+ * per side and nothing else. Two lone flying kings cannot force a capture on each
+ * other, so the game can only continue indefinitely. Deliberately narrow -- it
+ * recognizes ONLY this minimal case, never guessing at richer multi-piece
+ * endgames that might or might not be winnable. Requiring one king per *side*
+ * (not merely two kings total) matters: two same-color kings is a decisive
+ * position, not a draw, and must never be classified here.
+ *
+ * The caller must still gate this on the side to move having no immediate capture
+ * -- reducing TO one-king-each via a capture leaves the mover a possible winning
+ * jump of the last enemy king, which is a win, not a draw.
+ */
+export function isInsufficientMaterial(board: Board): boolean {
+  let red = 0;
+  let black = 0;
+  for (const row of board) {
+    for (const square of row) {
+      if (!square) continue;
+      if (square.kind !== 'king') return false;
+      if (square.color === 'red') red++;
+      else black++;
+      if (red > 1 || black > 1) return false;
+    }
+  }
+  return red === 1 && black === 1;
 }
 
 /**

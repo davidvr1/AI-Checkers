@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { createEmptyBoard, setPiece } from '../game/board';
+import { createEmptyBoard, positionKey, setPiece } from '../game/board';
 import type { Board, GameState, PieceColor } from '../game/types';
 import { evaluate } from './evaluate';
 
 function wonState(winner: PieceColor): GameState {
+  const board = createEmptyBoard();
   return {
-    board: createEmptyBoard(),
+    board,
     currentPlayer: winner,
     selected: null,
     mustContinueFrom: null,
@@ -13,6 +14,7 @@ function wonState(winner: PieceColor): GameState {
     capturedCount: { red: 0, black: 0 },
     status: { type: 'won', winner },
     history: [],
+    positionHistory: [positionKey(board, winner)],
   };
 }
 
@@ -26,6 +28,7 @@ function materialState(board: Board): GameState {
     capturedCount: { red: 0, black: 0 },
     status: { type: 'in-progress' },
     history: [],
+    positionHistory: [positionKey(board, 'red')],
   };
 }
 

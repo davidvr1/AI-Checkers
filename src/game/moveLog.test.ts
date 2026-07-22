@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createEmptyBoard, setPiece } from './board';
+import { createEmptyBoard, positionKey, setPiece } from './board';
 import { applyMove, gameReducer } from './gameReducer';
 import { buildLogEntry, formatLogEntry } from './moveLog';
 import type { Board, GameState, PieceColor, PieceKind, Position } from './types';
@@ -18,6 +18,7 @@ function baseState(board: Board, currentPlayer: PieceColor = 'red'): GameState {
     capturedCount: { red: 0, black: 0 },
     status: { type: 'in-progress' },
     history: [],
+    positionHistory: [positionKey(board, currentPlayer)],
   };
 }
 

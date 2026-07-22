@@ -24,8 +24,9 @@ export function GameSetup({ onStart }: GameSetupProps) {
         <span className="eyebrow">New game</span>
         <h1>Checkers, on the web</h1>
         <p className="sub">
-          Standard American draughts rules: captures are mandatory, multi-jumps chain
-          automatically, and a forced single move plays itself.
+          Israeli/international draughts rules: captures are mandatory, multi-jumps
+          chain, and kings fly any distance along a diagonal -- click through every
+          move, even a forced one.
         </p>
       </div>
 

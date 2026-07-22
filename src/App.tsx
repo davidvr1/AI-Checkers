@@ -88,8 +88,9 @@ function GameScreen({ config, onNewGame }: GameScreenProps) {
         <span className="eyebrow">{config.mode === 'human' ? 'Local two-player' : 'Human vs AI'}</span>
         <h1>Checkers, on the web</h1>
         <p className="sub">
-          Standard American draughts rules: captures are mandatory and multi-jumps
-          chain -- click through every move, even a forced one.
+          Israeli/international draughts rules: captures are mandatory and multi-jumps
+          chain, kings fly any distance along a diagonal -- click through every move,
+          even a forced one.
         </p>
         <button type="button" className="new-game" onClick={onNewGame}>
           New Game
