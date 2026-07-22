@@ -1,10 +1,5 @@
 import { expect, test } from '@playwright/test';
-
-const BOARD_SIZE = 8;
-
-function squareIndex(row: number, col: number): number {
-  return row * BOARD_SIZE + col;
-}
+import { squareIndex } from './helpers';
 
 test('a vs-AI game lets the human move and the AI responds in turn', async ({ page }) => {
   await page.goto('/');

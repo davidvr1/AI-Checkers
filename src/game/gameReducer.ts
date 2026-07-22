@@ -1,4 +1,5 @@
 import { createInitialBoard, isOnBoard, samePosition } from './board';
+import { buildLogEntry } from './moveLog';
 import { applyMoveToBoard, getAllLegalMoves, hasAnyLegalMove, pieceCaptureMoves } from './rules';
 import type { Action, GameState, Move, Position } from './types';
 
@@ -13,6 +14,7 @@ export function createInitialState(): GameState {
     turnsSinceCapture: 0,
     capturedCount: { red: 0, black: 0 },
     status: { type: 'in-progress' },
+    history: [],
   };
 }
 
@@ -21,6 +23,13 @@ export function createInitialState(): GameState {
  * resolved from a human click or (later) an AI/network move source -- flows through
  * here. Handles capture bookkeeping, multi-jump continuation, promotion already
  * having happened in rules.ts, and win/draw detection.
+ *
+ * Deliberately pure, with no logging side effect: the AI's search (minimax.ts)
+ * calls this many thousands of times per turn on hypothetical positions that are
+ * never actually played, so recording history here would flood the audit trail
+ * with moves that never happened. `history` passes through unchanged (via the
+ * `...state` spreads below) -- only `withHistory`, called from the reducer's real
+ * dispatch paths below, ever appends a new entry.
  */
 export function applyMove(state: GameState, move: Move): GameState {
   const { board: nextBoard } = applyMoveToBoard(state.board, move);
@@ -71,6 +80,16 @@ export function applyMove(state: GameState, move: Move): GameState {
   };
 }
 
+/**
+ * Wraps a real, committed move with its audit-trail entry. Only ever called from
+ * the reducer's own dispatch paths below (a human click or an AI PLAY_MOVE) --
+ * never from the AI's internal search, which must stay on the plain, unlogged
+ * `applyMove`.
+ */
+function withHistory(state: GameState, move: Move, nextState: GameState): GameState {
+  return { ...nextState, history: [...state.history, buildLogEntry(state, move, nextState)] };
+}
+
 /** The legal moves the player-to-move (or an in-progress multi-jump) may currently choose from. */
 export function currentLegalMoves(state: GameState): Move[] {
   if (state.mustContinueFrom) {
@@ -95,7 +114,7 @@ function handleSelectSquare(state: GameState, position: Position): GameState {
   if (state.mustContinueFrom) {
     const moves = pieceCaptureMoves(state.board, state.mustContinueFrom, state.currentPlayer);
     const move = moves.find((m) => samePosition(m.to, position));
-    return move ? applyMove(state, move) : state;
+    return move ? withHistory(state, move, applyMove(state, move)) : state;
   }
 
   const legalMoves = getAllLegalMoves(state.board, state.currentPlayer);
@@ -108,7 +127,7 @@ function handleSelectSquare(state: GameState, position: Position): GameState {
       (m) => samePosition(m.from, state.selected!) && samePosition(m.to, position),
     );
     if (move) {
-      return applyMove(state, move);
+      return withHistory(state, move, applyMove(state, move));
     }
   }
 
@@ -130,7 +149,7 @@ export function gameReducer(state: GameState, action: Action): GameState {
     case 'PLAY_MOVE': {
       if (state.status.type !== 'in-progress') return state;
       const legalMove = currentLegalMoves(state).find((m) => sameMove(m, action.move));
-      return legalMove ? applyMove(state, legalMove) : state;
+      return legalMove ? withHistory(state, legalMove, applyMove(state, legalMove)) : state;
     }
     default:
       return state;

@@ -17,6 +17,7 @@ function baseState(board: Board, currentPlayer: PieceColor = 'red'): GameState {
     turnsSinceCapture: 0,
     capturedCount: { red: 0, black: 0 },
     status: { type: 'in-progress' },
+    history: [],
   };
 }
 

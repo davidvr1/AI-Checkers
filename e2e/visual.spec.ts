@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test } from '@playwright/test';
+import { squareIndex } from './helpers';
 
 /**
  * These tests read the approved design sketch (docs/design/board-sketch.html)
@@ -100,14 +101,9 @@ test('brass accent is used for the live selection ring and the legend', async ({
   await expect(ringSwatch).toHaveCSS('border-color', hexToRgb(brass));
 
   // Live selection: click a movable red piece and check the resulting ring color.
-  // Squares render in row-major order (row * BOARD_SIZE + col); in the standard
-  // starting position, (row 5, col 2) holds a red man with legal moves.
-  const BOARD_SIZE = 8;
-  const STARTING_MOVABLE_RED_SQUARE = { row: 5, col: 2 };
+  // In the standard starting position, (row 5, col 2) holds a red man with legal moves.
   const squares = page.locator('.board > .sq');
-  await squares
-    .nth(STARTING_MOVABLE_RED_SQUARE.row * BOARD_SIZE + STARTING_MOVABLE_RED_SQUARE.col)
-    .click();
+  await squares.nth(squareIndex(5, 2)).click();
 
   const selectedSquare = page.locator('.sq.selected');
   await expect(selectedSquare).toHaveCount(1);

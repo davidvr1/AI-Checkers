@@ -33,6 +33,28 @@ export type GameStatus =
   | { type: 'won'; winner: PieceColor }
   | { type: 'draw' };
 
+/**
+ * One entry in the game's audit trail: what moved, whether it captured
+ * something and why that piece was removed (capture is the only way a piece is
+ * ever removed from the board), and whether it promoted. Appended only for
+ * moves that actually happen in the real game -- never for a hypothetical
+ * position the AI's search merely considered.
+ */
+export interface MoveLogEntry {
+  index: number;
+  player: PieceColor;
+  piece: Piece;
+  from: Position;
+  to: Position;
+  captured?: {
+    position: Position;
+    piece: Piece;
+    reason: string;
+  };
+  promoted: boolean;
+  resultingStatus: GameStatus;
+}
+
 export interface GameState {
   board: Board;
   currentPlayer: PieceColor;
@@ -44,6 +66,8 @@ export interface GameState {
   turnsSinceCapture: number;
   capturedCount: CapturedCount;
   status: GameStatus;
+  /** Every move actually played so far, oldest first. See MoveLogEntry. */
+  history: MoveLogEntry[];
 }
 
 export type GameMode = 'human' | 'ai';
