@@ -122,24 +122,31 @@ export function hasAnyLegalMove(board: Board, player: PieceColor): boolean {
 }
 
 /**
- * True when neither side has enough material left to force a win -- currently
- * just the unambiguous minimal case, one flying king per side and nothing else,
- * which can shuffle forever without either side ever being forced into a capture.
- * Deliberately conservative: it never misjudges a position that could still be
- * won as a draw, at the cost of not catching every drawn-but-technically-winnable
- * king endgame.
+ * True for the one unambiguously drawn material configuration: exactly one king
+ * per side and nothing else. Two lone flying kings cannot force a capture on each
+ * other, so the game can only continue indefinitely. Deliberately narrow -- it
+ * recognizes ONLY this minimal case, never guessing at richer multi-piece
+ * endgames that might or might not be winnable. Requiring one king per *side*
+ * (not merely two kings total) matters: two same-color kings is a decisive
+ * position, not a draw, and must never be classified here.
+ *
+ * The caller must still gate this on the side to move having no immediate capture
+ * -- reducing TO one-king-each via a capture leaves the mover a possible winning
+ * jump of the last enemy king, which is a win, not a draw.
  */
 export function isInsufficientMaterial(board: Board): boolean {
-  let total = 0;
+  let red = 0;
+  let black = 0;
   for (const row of board) {
     for (const square of row) {
       if (!square) continue;
       if (square.kind !== 'king') return false;
-      total++;
-      if (total > 2) return false;
+      if (square.color === 'red') red++;
+      else black++;
+      if (red > 1 || black > 1) return false;
     }
   }
-  return total === 2;
+  return red === 1 && black === 1;
 }
 
 /**

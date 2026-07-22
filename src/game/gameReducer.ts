@@ -1,16 +1,14 @@
 import { createInitialBoard, isOnBoard, positionKey, samePosition } from './board';
 import { buildLogEntry } from './moveLog';
-import {
-  applyMoveToBoard,
-  getAllLegalMoves,
-  hasAnyLegalMove,
-  isInsufficientMaterial,
-  pieceCaptureMoves,
-} from './rules';
+import { applyMoveToBoard, getAllLegalMoves, isInsufficientMaterial, pieceCaptureMoves } from './rules';
 import type { Action, GameState, Move, Position } from './types';
 
-/** Combined half-move count (both players) with no capture before it's a draw --
- * the page's "50 consecutive moves without a change in piece count" rule. */
+/**
+ * No-capture draw threshold, counted in half-moves (individual turn-passes, both
+ * players combined) -- so 50 here is 25 moves per side. Maps to the source page's
+ * "50 consecutive moves without a change in piece count" rule. `turnsSinceCapture`
+ * increments once per turn-pass and resets to 0 on any capture.
+ */
 export const DRAW_TURN_LIMIT = 50;
 
 export function createInitialState(): GameState {
@@ -42,7 +40,7 @@ export function createInitialState(): GameState {
  * dispatch paths below, ever appends a new entry.
  */
 export function applyMove(state: GameState, move: Move): GameState {
-  const { board: nextBoard } = applyMoveToBoard(state.board, move);
+  const { board: nextBoard, promoted } = applyMoveToBoard(state.board, move);
   const madeCapture = move.captured !== undefined;
 
   const capturedCount = madeCapture
@@ -52,9 +50,11 @@ export function applyMove(state: GameState, move: Move): GameState {
       }
     : state.capturedCount;
 
-  const continuationMoves = madeCapture
-    ? pieceCaptureMoves(nextBoard, move.to, state.currentPlayer)
-    : [];
+  // A man that reaches the back row is crowned and its turn ends immediately --
+  // even mid-chain with a further capture available. Only an already-a-king
+  // capture (no promotion this step) may continue the multi-jump.
+  const continuationMoves =
+    madeCapture && !promoted ? pieceCaptureMoves(nextBoard, move.to, state.currentPlayer) : [];
 
   if (continuationMoves.length > 0) {
     return {
@@ -77,11 +77,22 @@ export function applyMove(state: GameState, move: Move): GameState {
   const positionHistory = madeCapture ? [nextKey] : [...state.positionHistory, nextKey];
   const repeated3Times = positionHistory.filter((key) => key === nextKey).length >= 3;
 
-  const status: GameState['status'] = !hasAnyLegalMove(nextBoard, nextPlayer)
-    ? { type: 'won', winner: state.currentPlayer }
-    : turnsSinceCapture >= DRAW_TURN_LIMIT || repeated3Times || isInsufficientMaterial(nextBoard)
-      ? { type: 'draw' }
-      : { type: 'in-progress' };
+  // Generate the next player's moves once and reuse: for the win check (no legal
+  // move), and to gate the insufficient-material draw. A bare king-vs-king board
+  // is only a draw if the side to move has NO capture available -- if it can jump
+  // the opponent's last king, that is a win a ply away, not a draw, so we let the
+  // game continue and the capture resolve it.
+  const nextLegalMoves = getAllLegalMoves(nextBoard, nextPlayer);
+  const nextHasCapture = nextLegalMoves.some((m) => m.captured !== undefined);
+
+  const status: GameState['status'] =
+    nextLegalMoves.length === 0
+      ? { type: 'won', winner: state.currentPlayer }
+      : turnsSinceCapture >= DRAW_TURN_LIMIT ||
+          repeated3Times ||
+          (isInsufficientMaterial(nextBoard) && !nextHasCapture)
+        ? { type: 'draw' }
+        : { type: 'in-progress' };
 
   return {
     ...state,

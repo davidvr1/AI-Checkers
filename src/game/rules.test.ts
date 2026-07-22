@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyBoard, createInitialBoard, positionKey, setPiece } from './board';
-import { DRAW_TURN_LIMIT, applyMove, createInitialState, gameReducer } from './gameReducer';
-import { applyMoveToBoard, getAllLegalMoves, hasAnyLegalMove, pieceCaptureMoves, pieceSimpleMoves } from './rules';
+import { DRAW_TURN_LIMIT, applyMove, createInitialState, currentLegalMoves, gameReducer } from './gameReducer';
+import {
+  applyMoveToBoard,
+  getAllLegalMoves,
+  hasAnyLegalMove,
+  isInsufficientMaterial,
+  pieceCaptureMoves,
+  pieceSimpleMoves,
+} from './rules';
 import type { Board, GameState, Position } from './types';
 
 function place(board: Board, pos: Position, color: 'red' | 'black', kind: 'man' | 'king' = 'man'): Board {
@@ -121,33 +128,43 @@ describe('promotion', () => {
     ]);
   });
 
-  it('continues a multi-jump as a king, including a backward capture, once a man promotes mid-chain', () => {
+  it('ends the turn immediately when a man promotes mid-chain, even if a further capture exists', () => {
     let board = createEmptyBoard();
     board = place(board, { row: 2, col: 4 }, 'red', 'man');
-    board = place(board, { row: 1, col: 3 }, 'black'); // first jump: captured landing on row 0 -> promotes
-    board = place(board, { row: 1, col: 1 }, 'black'); // second jump: only reachable backward, as a king
+    board = place(board, { row: 1, col: 3 }, 'black'); // first jump: captured, landing on row 0 -> promotes
+    board = place(board, { row: 1, col: 1 }, 'black'); // a would-be second jump, reachable only as a king
 
-    // Before the chain starts, a plain man landing on (0,2) could never reach
-    // (2,0) next -- that direction only becomes legal once it is a king.
     let state = baseState(board, 'red');
     state = gameReducer(state, { type: 'SELECT_SQUARE', position: { row: 2, col: 4 } });
-    // Landing on (0,2) promotes the man to a king. Even though exactly one further
-    // capture exists, it is NOT auto-played -- the chain stays open, waiting for
-    // an explicit click on the (single, highlighted) continuation.
+    // Landing on (0,2) crowns the man. Under the Israeli/international rule (and
+    // the user's renegotiation), promotion ENDS the turn -- the piece does not
+    // keep capturing as a freshly-minted king, so the further jump to (2,0) is
+    // never offered and the turn passes to black.
     state = gameReducer(state, { type: 'SELECT_SQUARE', position: { row: 0, col: 2 } });
 
-    expect(state.mustContinueFrom).toEqual({ row: 0, col: 2 });
-    expect(state.currentPlayer).toBe('red');
-    expect(state.capturedCount.red).toBe(1);
+    expect(state.mustContinueFrom).toBeNull();
+    expect(state.currentPlayer).toBe('black');
+    expect(state.capturedCount.red).toBe(1); // only the first jump counted
     expect(state.board[0][2]).toEqual({ color: 'red', kind: 'king' });
+    expect(state.board[1][1]).not.toBeNull(); // the second black piece survives -- never captured
+  });
 
-    // Clicking the forced continuation completes the chain.
-    state = gameReducer(state, { type: 'SELECT_SQUARE', position: { row: 2, col: 0 } });
+  it('still lets an already-a-king continue a multi-jump chain (promotion-ends-turn does not apply to kings)', () => {
+    let board = createEmptyBoard();
+    board = place(board, { row: 4, col: 4 }, 'red', 'king'); // already a king
+    board = place(board, { row: 3, col: 3 }, 'black'); // first jump target
+    board = place(board, { row: 1, col: 1 }, 'black'); // forced continuation target
+
+    let state = baseState(board, 'red');
+    state = gameReducer(state, { type: 'SELECT_SQUARE', position: { row: 4, col: 4 } });
+    state = gameReducer(state, { type: 'SELECT_SQUARE', position: { row: 2, col: 2 } }); // leg 1
+    expect(state.mustContinueFrom).toEqual({ row: 2, col: 2 }); // chain stays open
+    expect(state.currentPlayer).toBe('red');
+
+    state = gameReducer(state, { type: 'SELECT_SQUARE', position: { row: 0, col: 0 } }); // leg 2
     expect(state.mustContinueFrom).toBeNull();
     expect(state.currentPlayer).toBe('black');
     expect(state.capturedCount.red).toBe(2);
-    expect(state.board[2][0]).toEqual({ color: 'red', kind: 'king' });
-    expect(state.board[1][1]).toBeNull();
   });
 });
 
@@ -267,14 +284,36 @@ describe('threefold repetition', () => {
 
 // --- Insufficient material -----------------------------------------------------
 describe('insufficient material', () => {
-  it('draws immediately once only one king remains on each side', () => {
+  it('draws once reduced to one king per side with no capture available to the mover', () => {
     let board = createEmptyBoard();
     board = place(board, { row: 7, col: 0 }, 'red', 'king');
-    board = place(board, { row: 0, col: 7 }, 'black', 'king'); // same diagonal, but at the far corner: no landing square beyond it, so no capture is forced
+    board = place(board, { row: 0, col: 3 }, 'black', 'king'); // not on a shared open diagonal with red after the move
     const state = baseState(board, 'red');
 
+    // After (7,0)->(6,1), black king at (0,3) has no diagonal line to red at (6,1),
+    // so black cannot capture -- two lone kings that can only shuffle: a draw.
     const next = applyMove(state, { from: { row: 7, col: 0 }, to: { row: 6, col: 1 } });
     expect(next.status).toEqual({ type: 'draw' });
+  });
+
+  it('does NOT draw when reducing to one king per side leaves the mover a winning capture', () => {
+    // Red king (7,0), black king (0,7) sit on the same long diagonal. Red slides to
+    // (6,1); now black (0,7) can fly down that diagonal and capture red's last king
+    // -- so this is a win a ply away, NOT insufficient-material. The engine must let
+    // the game continue rather than declaring an immediate draw.
+    let board = createEmptyBoard();
+    board = place(board, { row: 7, col: 0 }, 'red', 'king');
+    board = place(board, { row: 0, col: 7 }, 'black', 'king');
+    let state = baseState(board, 'red');
+
+    state = applyMove(state, { from: { row: 7, col: 0 }, to: { row: 6, col: 1 } });
+    expect(state.status).toEqual({ type: 'in-progress' }); // not a draw -- black can capture
+    expect(currentLegalMoves(state).some((m) => m.captured !== undefined)).toBe(true);
+
+    // Black takes red's last king -> red has no pieces -> black wins.
+    const winning = currentLegalMoves(state).find((m) => m.captured !== undefined)!;
+    state = applyMove(state, winning);
+    expect(state.status).toEqual({ type: 'won', winner: 'black' });
   });
 
   it('does not draw while any side still has a man on the board', () => {
@@ -285,6 +324,18 @@ describe('insufficient material', () => {
 
     const next = applyMove(state, { from: { row: 7, col: 0 }, to: { row: 6, col: 1 } });
     expect(next.status).toEqual({ type: 'in-progress' });
+  });
+
+  it('isInsufficientMaterial requires one king per SIDE, not merely two kings total', () => {
+    let board = createEmptyBoard();
+    board = place(board, { row: 7, col: 0 }, 'red', 'king');
+    board = place(board, { row: 5, col: 2 }, 'red', 'king'); // two RED kings, no black
+    expect(isInsufficientMaterial(board)).toBe(false);
+
+    board = createEmptyBoard();
+    board = place(board, { row: 7, col: 0 }, 'red', 'king');
+    board = place(board, { row: 0, col: 7 }, 'black', 'king');
+    expect(isInsufficientMaterial(board)).toBe(true);
   });
 });
 
@@ -383,6 +434,62 @@ describe('a man may only capture an enemy king moving forward', () => {
     expect(moves).toEqual([
       { from: { row: 3, col: 3 }, to: { row: 5, col: 5 }, captured: { row: 4, col: 4 } },
     ]);
+  });
+});
+
+describe('flying kings: long-range multi-jump chain through the reducer', () => {
+  it('captures at range, then continues on a new diagonal, all in one turn', () => {
+    let board = createEmptyBoard();
+    board = place(board, { row: 7, col: 0 }, 'red', 'king');
+    board = place(board, { row: 4, col: 3 }, 'black', 'king'); // leg 1 target: up-right, at range from (7,0)
+    board = place(board, { row: 1, col: 4 }, 'black', 'king'); // leg 2 target: up-left from the (2,5) landing
+
+    let state = baseState(board, 'red');
+    state = gameReducer(state, { type: 'SELECT_SQUARE', position: { row: 7, col: 0 } });
+
+    // Leg 1: sliding up-right, the king jumps (4,3) and may land on any empty square
+    // beyond it -- (3,4), (2,5), (1,6), or (0,7). Choose (2,5), from which a second
+    // capture (of the king at (1,4), up-left, landing (0,3)) becomes available.
+    state = gameReducer(state, { type: 'SELECT_SQUARE', position: { row: 2, col: 5 } });
+    expect(state.mustContinueFrom).toEqual({ row: 2, col: 5 }); // chain stays open (a king, not a promoting man)
+    expect(state.currentPlayer).toBe('red');
+    expect(state.board[4][3]).toBeNull(); // leg 1 piece removed
+
+    const continuations = currentLegalMoves(state);
+    expect(continuations).toEqual([
+      { from: { row: 2, col: 5 }, to: { row: 0, col: 3 }, captured: { row: 1, col: 4 } },
+    ]);
+    state = gameReducer(state, { type: 'SELECT_SQUARE', position: { row: 0, col: 3 } });
+
+    expect(state.currentPlayer).toBe('black'); // whole chain used exactly one turn
+    expect(state.capturedCount.red).toBe(2);
+    expect(state.board[1][4]).toBeNull();
+  });
+});
+
+describe('positionHistory: reset-on-capture invariant', () => {
+  it('appends a key on a non-capturing move but resets to just the new key on a capture', () => {
+    let board = createEmptyBoard();
+    board = place(board, { row: 5, col: 0 }, 'red', 'king');
+    board = place(board, { row: 2, col: 3 }, 'black', 'king');
+    board = place(board, { row: 6, col: 7 }, 'red', 'king'); // extra pieces so the board isn't 1-v-1 insufficient material
+    board = place(board, { row: 1, col: 6 }, 'black', 'king');
+    let state = baseState(board, 'red');
+    expect(state.positionHistory).toHaveLength(1); // seeded with the initial position
+
+    // A non-capturing move appends: history grows to 2.
+    state = applyMove(state, { from: { row: 5, col: 0 }, to: { row: 4, col: 1 } });
+    expect(state.positionHistory).toHaveLength(2);
+
+    // Black makes a non-capturing move: grows to 3.
+    state = applyMove(state, { from: { row: 1, col: 6 }, to: { row: 0, col: 5 } });
+    expect(state.positionHistory).toHaveLength(3);
+
+    // Red captures the black king at (2,3): a capture resets history to a single key.
+    const redCapture = currentLegalMoves(state).find((m) => m.captured !== undefined);
+    expect(redCapture).toBeDefined();
+    state = applyMove(state, redCapture!);
+    expect(state.positionHistory).toHaveLength(1);
   });
 });
 

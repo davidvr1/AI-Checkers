@@ -7,16 +7,17 @@ import { evaluate } from './evaluate';
  * hands the turn to the other side; a multi-jump chain within one player's own
  * turn costs zero additional plies (see the same-ply recursion note below).
  *
- * Benchmarked with a throwaway script against three positions: the initial
- * board (7 legal moves), a random 14-ply midgame (7-9 legal moves), and a
- * deliberately worst-case "many kings, wide open board" position (21 legal
- * moves -- kings move in all 4 directions, so this is close to the ceiling on
- * branching factor). Observed worst-case timings on the many-kings position:
- * depth 5 ~30ms, depth 6 ~90ms, depth 7 ~580ms, depth 8 ~910ms (beyond which the
- * 200k-node cap plateaus it). Hard is set to 7 for a comfortable margin under
- * the 2-second target even on hardware slower than the benchmarking machine.
- * `SEARCH_DEADLINE_MS` below is the actual enforcement of that target -- these
- * depths are just tuned so the deadline is rarely, if ever, the limiting factor.
+ * Originally benchmarked (throwaway script) against the initial board, a random
+ * 14-ply midgame, and a "many kings" position, when kings moved only one step in
+ * all 4 directions (~21-move ceiling): depth 5 ~30ms, 6 ~90ms, 7 ~580ms, 8 ~910ms.
+ * NOTE (Israeli-draughts ruleset, 2026-07-22): flying kings sharply raise the
+ * branching factor -- a single open king now has up to 13 simple destinations and
+ * several landing squares per capture -- so those timings no longer hold and the
+ * effective depth reached within the deadline is lower in king-heavy positions.
+ * These depths were NOT re-benchmarked; `SEARCH_DEADLINE_MS` below is now the real
+ * limiter (the search returns best-so-far on timeout), so latency stays bounded
+ * but Hard may search fewer plies than 7 in the endgame. Re-tuning is logged in
+ * deferred-work.md.
  */
 export const DIFFICULTY_DEPTH: Record<Difficulty, number> = {
   easy: 2,
