@@ -35,8 +35,14 @@ const MAX_NODES = 200_000;
  * "well under 2 seconds" target even under the node cap). Checked at the top of
  * every recursive call, so it bounds overshoot from any single in-flight subtree
  * as well as the total.
+ *
+ * The search runs synchronously on the main thread (deliberately -- a Web Worker
+ * is overkill for a local game), so this value doubles as the worst-case UI-freeze
+ * bound: it is kept low enough that the freeze stays sub-second, and that
+ * `AI_THINK_DELAY_MS` (400ms in App.tsx) + this + overshoot stays comfortably
+ * under the spec's 2-second target.
  */
-const SEARCH_DEADLINE_MS = 1500;
+const SEARCH_DEADLINE_MS = 1000;
 
 interface SearchContext {
   /** The color the search is choosing a move for; evaluate() is always scored from this perspective. */
@@ -81,32 +87,38 @@ function search(
   alpha: number,
   beta: number,
   ctx: SearchContext,
+  ply: number,
 ): number {
   ctx.nodes++;
 
-  if (state.status.type !== 'in-progress' || budgetExceeded(ctx)) {
-    return evaluate(state, ctx.aiColor);
+  // A terminal state has no moves and is always scored as-is.
+  if (state.status.type !== 'in-progress') {
+    return evaluate(state, ctx.aiColor, ply);
   }
 
-  // A depth-0 cutoff must not truncate a still-in-progress forced multi-jump --
-  // that continuation costs no extra ply (see isSamePly) and evaluating the
-  // intermediate board would understate material the chain is guaranteed to add.
-  if (depth <= 0 && !state.mustContinueFrom) {
-    return evaluate(state, ctx.aiColor);
+  // Neither the depth horizon nor a budget abort may truncate a still-in-progress
+  // forced multi-jump: that continuation costs no extra ply (see isSamePly) and
+  // evaluating the intermediate board would understate material the chain is
+  // guaranteed to add. A forced chain is finite, so it always resolves before the
+  // next cutoff check applies.
+  if ((depth <= 0 || budgetExceeded(ctx)) && !state.mustContinueFrom) {
+    return evaluate(state, ctx.aiColor, ply);
   }
 
   const moves = currentLegalMoves(state);
   if (moves.length === 0) {
-    return evaluate(state, ctx.aiColor);
+    return evaluate(state, ctx.aiColor, ply);
   }
 
   let best = maximizing ? -Infinity : Infinity;
 
   for (const move of moves) {
     const next = applyMove(state, move);
+    // Same-ply (mid-chain) continuation: same turn, so depth/side/ply all hold.
+    // A real turn-pass decrements depth, flips the side, and advances the ply.
     const value = isSamePly(state, next)
-      ? search(next, depth, maximizing, alpha, beta, ctx)
-      : search(next, depth - 1, !maximizing, alpha, beta, ctx);
+      ? search(next, depth, maximizing, alpha, beta, ctx, ply)
+      : search(next, depth - 1, !maximizing, alpha, beta, ctx, ply + 1);
 
     if (maximizing) {
       if (value > best) best = value;
@@ -150,9 +162,11 @@ export function chooseAiMove(state: GameState, depth: number): Move {
 
   for (const move of moves) {
     const next = applyMove(state, move);
+    // Root player is aiColor (maximizing). A same-ply continuation stays on ply 0
+    // (still the root turn); a real turn-pass hands ply 1 to the opponent.
     const value = isSamePly(state, next)
-      ? search(next, depth, true, alpha, beta, ctx)
-      : search(next, depth - 1, false, alpha, beta, ctx);
+      ? search(next, depth, true, alpha, beta, ctx, 0)
+      : search(next, depth - 1, false, alpha, beta, ctx, 1);
 
     if (value > bestValue) {
       bestValue = value;

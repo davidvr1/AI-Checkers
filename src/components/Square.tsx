@@ -24,7 +24,8 @@ export function Square({ isDark, piece, isSelected, isLegalDestination, disabled
     <div
       className={classes}
       role="button"
-      tabIndex={0}
+      aria-disabled={disabled}
+      tabIndex={disabled ? -1 : 0}
       onClick={activate}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {

@@ -134,3 +134,16 @@ Evaluation: score = (ownMen + ownKings * 1.5) - (oppMen + oppKings * 1.5) from t
 
 - Shared `capitalize` replaces three copies; `GameConfig` moved to the domain layer; dead `gameKey` removed.
   [`format.ts:1`](../../src/format.ts#L1)
+
+### Review Findings
+
+_Independent code review (Opus, 2026-07-22): Blind Hunter + Edge Case Hunter + Acceptance Auditor. Acceptance Auditor found zero spec violations — every AC and "Always" constraint verified implemented. Findings below are quality/robustness around the AI's edges._
+
+- [x] [Review][Patch] (was Decision — resolved: accept the freeze, no Web Worker) Search runs on the main thread; kept there, `SEARCH_DEADLINE_MS` tightened 1500→1000ms so the freeze stays sub-second and delay+search+overshoot stays under 2s. [`src/ai/minimax.ts:39`] — **fixed**
+- [x] [Review][Dismiss] (was Decision — resolved: keep deterministic) AI has no tie-breaking; same difficulty + position plays an identical game. User chose to keep deterministic behavior (predictable + keeps move-exact tests stable). No change.
+- [x] [Review][Patch] Terminal win/loss scores are not depth-adjusted — flat ±10000, so a winning AI had no incentive to convert (could drift to draw-at-40). Now folds ply-distance into the terminal score (`WIN_SCORE - ply`), locked by new `evaluate.test.ts`. [`src/ai/evaluate.ts:16`] — **fixed**
+- [x] [Review][Patch] Budget cutoff truncated a forced multi-jump — `budgetExceeded` now shares the `!mustContinueFrom` carve-out with the depth-0 guard, so an abort mid-chain no longer understates guaranteed captures. [`src/ai/minimax.ts:87`] — **fixed**
+- [x] [Review][Patch] Total AI latency could exceed the "well under 2s" target — deadline tightened (see first item); 400ms delay + 1000ms search + overshoot now stays under 2s. [`src/ai/minimax.ts:39`] — **fixed**
+- [x] [Review][Patch] Disabled squares not exposed to assistive tech — now sets `aria-disabled={disabled}` and `tabIndex={disabled ? -1 : 0}`. [`src/components/Square.tsx:27`] — **fixed**
+- [x] [Review][Patch] Flaky wall-clock unit assertion removed; the depth test keeps its legal-move correctness assertions. [`src/ai/minimax.test.ts:132`] — **fixed**
+- [x] [Review][Defer] Crowning mid-jump doesn't end the turn [`src/game/rules.ts`] — deferred, pre-existing. Standard American/English draughts ends the move on promotion; the shared engine (from the base-game story) lets a freshly-crowned man keep jumping, and the AI now exploits it. Rules-correctness question for a focused pass, not caused by this change.
