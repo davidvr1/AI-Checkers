@@ -2,11 +2,12 @@ import { useEffect, useReducer, useRef, useState } from 'react';
 import { chooseAiMove, DIFFICULTY_DEPTH } from './ai/minimax';
 import { Board } from './components/Board';
 import { GameSetup } from './components/GameSetup';
+import { LanguageToggle } from './components/LanguageToggle';
 import { StatusBar } from './components/StatusBar';
-import { capitalize } from './format';
 import { createInitialState, gameReducer } from './game/gameReducer';
 import { formatLogEntry } from './game/moveLog';
 import type { GameConfig, MoveLogEntry, PieceColor, Position } from './game/types';
+import { useLang } from './i18n';
 
 /** A short pause before the AI actually computes, so "AI is thinking" reads as real
  * even on a forced move where there's nothing to search. */
@@ -24,6 +25,7 @@ interface GameScreenProps {
 }
 
 function GameScreen({ config, onNewGame }: GameScreenProps) {
+  const { t } = useLang();
   const [state, dispatch] = useReducer(gameReducer, undefined, createInitialState);
 
   const aiConfig = config.mode === 'ai' ? config : null;
@@ -80,25 +82,25 @@ function GameScreen({ config, onNewGame }: GameScreenProps) {
   };
 
   const opponentLabel =
-    config.mode === 'human' ? 'vs Human' : `vs AI · ${capitalize(config.difficulty)}`;
+    config.mode === 'human' ? t.status.vsHuman : t.status.vsAiWith(t.difficulties[config.difficulty]);
 
   return (
     <>
       <div className="masthead">
-        <span className="eyebrow">{config.mode === 'human' ? 'Local two-player' : 'Human vs AI'}</span>
-        <h1>Checkers, on the web</h1>
-        <p className="sub">
-          Israeli/international draughts rules: captures are mandatory and multi-jumps
-          chain, kings fly any distance along a diagonal -- click through every move,
-          even a forced one.
-        </p>
+        <span className="eyebrow">
+          {config.mode === 'human' ? t.masthead.localTwoPlayer : t.masthead.humanVsAi}
+        </span>
+        <h1>{t.appTitle}</h1>
+        <p className="sub">{t.rulesBlurb}</p>
         <button type="button" className="new-game" onClick={onNewGame}>
-          New Game
+          {t.masthead.newGameButton}
         </button>
       </div>
 
       <div className="program">
-        <div className="board-card">
+        {/* Board is pinned LTR so its 8x8 grid never mirrors under Hebrew RTL --
+            piece colors stay on the same sides regardless of UI language. */}
+        <div className="board-card" dir="ltr">
           <Board state={state} onSelectSquare={handleSelectSquare} disabled={isAiTurn} />
         </div>
         <StatusBar state={state} opponentLabel={opponentLabel} aiThinking={isAiTurn} />
@@ -110,9 +112,14 @@ function GameScreen({ config, onNewGame }: GameScreenProps) {
 export function App() {
   const [config, setConfig] = useState<GameConfig | null>(null);
 
-  if (!config) {
-    return <GameSetup onStart={setConfig} />;
-  }
-
-  return <GameScreen config={config} onNewGame={() => setConfig(null)} />;
+  return (
+    <>
+      <LanguageToggle />
+      {config ? (
+        <GameScreen config={config} onNewGame={() => setConfig(null)} />
+      ) : (
+        <GameSetup onStart={setConfig} />
+      )}
+    </>
+  );
 }

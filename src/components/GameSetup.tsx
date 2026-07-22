@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { capitalize } from '../format';
+import { useLang } from '../i18n';
 import type { Difficulty, GameConfig, GameMode, PieceColor } from '../game/types';
 
 interface GameSetupProps {
@@ -10,6 +10,7 @@ const DIFFICULTIES: Difficulty[] = ['easy', 'medium', 'hard'];
 const COLORS: PieceColor[] = ['red', 'black'];
 
 export function GameSetup({ onStart }: GameSetupProps) {
+  const { t } = useLang();
   const [mode, setMode] = useState<GameMode>('human');
   const [humanColor, setHumanColor] = useState<PieceColor>('red');
   const [difficulty, setDifficulty] = useState<Difficulty>('medium');
@@ -21,18 +22,14 @@ export function GameSetup({ onStart }: GameSetupProps) {
   return (
     <div className="setup">
       <div className="masthead">
-        <span className="eyebrow">New game</span>
-        <h1>Checkers, on the web</h1>
-        <p className="sub">
-          Israeli/international draughts rules: captures are mandatory, multi-jumps
-          chain, and kings fly any distance along a diagonal -- click through every
-          move, even a forced one.
-        </p>
+        <span className="eyebrow">{t.masthead.newGameEyebrow}</span>
+        <h1>{t.appTitle}</h1>
+        <p className="sub">{t.rulesBlurb}</p>
       </div>
 
       <div className="setup-card">
         <div className="setup-group">
-          <span className="setup-label" id="mode-label">Mode</span>
+          <span className="setup-label" id="mode-label">{t.setup.mode}</span>
           <div className="setup-options" role="group" aria-labelledby="mode-label">
             <button
               type="button"
@@ -40,7 +37,7 @@ export function GameSetup({ onStart }: GameSetupProps) {
               className={`setup-option ${mode === 'human' ? 'active' : ''}`}
               onClick={() => setMode('human')}
             >
-              vs Human
+              {t.setup.vsHuman}
             </button>
             <button
               type="button"
@@ -48,7 +45,7 @@ export function GameSetup({ onStart }: GameSetupProps) {
               className={`setup-option ${mode === 'ai' ? 'active' : ''}`}
               onClick={() => setMode('ai')}
             >
-              vs AI
+              {t.setup.vsAi}
             </button>
           </div>
         </div>
@@ -56,7 +53,7 @@ export function GameSetup({ onStart }: GameSetupProps) {
         {mode === 'ai' && (
           <>
             <div className="setup-group">
-              <span className="setup-label" id="color-label">Your color</span>
+              <span className="setup-label" id="color-label">{t.setup.yourColor}</span>
               <div className="setup-options" role="group" aria-labelledby="color-label">
                 {COLORS.map((color) => (
                   <button
@@ -66,14 +63,14 @@ export function GameSetup({ onStart }: GameSetupProps) {
                     className={`setup-option ${humanColor === color ? 'active' : ''}`}
                     onClick={() => setHumanColor(color)}
                   >
-                    {capitalize(color)}
+                    {t.colors[color]}
                   </button>
                 ))}
               </div>
             </div>
 
             <div className="setup-group">
-              <span className="setup-label" id="difficulty-label">Difficulty</span>
+              <span className="setup-label" id="difficulty-label">{t.setup.difficulty}</span>
               <div className="setup-options" role="group" aria-labelledby="difficulty-label">
                 {DIFFICULTIES.map((level) => (
                   <button
@@ -83,7 +80,7 @@ export function GameSetup({ onStart }: GameSetupProps) {
                     className={`setup-option ${difficulty === level ? 'active' : ''}`}
                     onClick={() => setDifficulty(level)}
                   >
-                    {capitalize(level)}
+                    {t.difficulties[level]}
                   </button>
                 ))}
               </div>
@@ -92,7 +89,7 @@ export function GameSetup({ onStart }: GameSetupProps) {
         )}
 
         <button type="button" className="setup-start" onClick={handleStart}>
-          Start Game
+          {t.setup.startGame}
         </button>
       </div>
     </div>
