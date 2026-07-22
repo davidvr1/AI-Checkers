@@ -12,10 +12,17 @@ const WIN_SCORE = 10_000;
  * Terminal states score independently of material -- a win/loss swamps any board
  * count, and a draw is exactly neutral. In-progress states score on material alone
  * (men vs. kings), per the spec's "keep it simple for v1" design note.
+ *
+ * `ply` is the number of turn-passes from the search root. It nudges terminal
+ * scores toward faster wins and slower losses: a win costs 1 point per ply, so a
+ * mate-in-2 outranks a mate-in-6, and a forced loss is delayed as long as
+ * possible. The adjustment is tiny relative to WIN_SCORE, so it only ever
+ * tie-breaks among winning (or among losing) lines -- it never reorders a win
+ * against a non-win or perturbs the material comparison of in-progress positions.
  */
-export function evaluate(state: GameState, color: PieceColor): number {
+export function evaluate(state: GameState, color: PieceColor, ply = 0): number {
   if (state.status.type === 'won') {
-    return state.status.winner === color ? WIN_SCORE : -WIN_SCORE;
+    return state.status.winner === color ? WIN_SCORE - ply : -WIN_SCORE + ply;
   }
   if (state.status.type === 'draw') {
     return 0;
