@@ -4,14 +4,11 @@ import { Board } from './components/Board';
 import { GameSetup } from './components/GameSetup';
 import { StatusBar } from './components/StatusBar';
 import { capitalize } from './format';
-import { createInitialState, currentLegalMoves, gameReducer, withAutoPlay } from './game/gameReducer';
+import { createInitialState, gameReducer } from './game/gameReducer';
 import type { GameConfig, PieceColor, Position } from './game/types';
 
-function init() {
-  return withAutoPlay(createInitialState());
-}
-
-/** A short pause before the AI actually computes, so "AI is thinking" reads as real. */
+/** A short pause before the AI actually computes, so "AI is thinking" reads as real
+ * even on a forced move where there's nothing to search. */
 const AI_THINK_DELAY_MS = 400;
 
 interface GameScreenProps {
@@ -20,7 +17,7 @@ interface GameScreenProps {
 }
 
 function GameScreen({ config, onNewGame }: GameScreenProps) {
-  const [state, dispatch] = useReducer(gameReducer, undefined, init);
+  const [state, dispatch] = useReducer(gameReducer, undefined, createInitialState);
 
   const aiConfig = config.mode === 'ai' ? config : null;
   const aiColor: PieceColor | null = aiConfig ? (aiConfig.humanColor === 'red' ? 'black' : 'red') : null;
@@ -28,10 +25,10 @@ function GameScreen({ config, onNewGame }: GameScreenProps) {
 
   useEffect(() => {
     if (!aiConfig || !isAiTurn) return;
-    // Defensive per the spec: the AI only ever runs a search when there is a real
-    // choice. A forced single move/continuation is already handled by withAutoPlay
-    // before this state was ever rendered.
-    if (currentLegalMoves(state).length <= 1) return;
+    // No auto-play: the AI always goes through the same visible thinking pause and
+    // PLAY_MOVE dispatch, even when currentLegalMoves has exactly one option --
+    // chooseAiMove's own length===1 fast path skips the search, but the turn is
+    // still an explicit, visible action rather than a silent skip.
 
     let cancelled = false;
     const timer = setTimeout(() => {
@@ -60,8 +57,8 @@ function GameScreen({ config, onNewGame }: GameScreenProps) {
         <span className="eyebrow">{config.mode === 'human' ? 'Local two-player' : 'Human vs AI'}</span>
         <h1>Checkers, on the web</h1>
         <p className="sub">
-          Standard American draughts rules: captures are mandatory, multi-jumps chain
-          automatically, and a forced single move plays itself.
+          Standard American draughts rules: captures are mandatory and multi-jumps
+          chain -- click through every move, even a forced one.
         </p>
         <button type="button" className="new-game" onClick={onNewGame}>
           New Game

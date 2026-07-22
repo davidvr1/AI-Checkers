@@ -347,13 +347,6 @@ hr.rule {
   background: var(--brass);
 }
 
-.legend-swatch.auto {
-  background: var(--brass-soft);
-  color: var(--brass);
-  font-size: 10px;
-  font-weight: 700;
-}
-
 /* ---- Pre-game setup screen ---- */
 .setup {
   display: flex;

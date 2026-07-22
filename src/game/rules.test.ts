@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyBoard, createInitialBoard, setPiece } from './board';
-import { applyMove, createInitialState, gameReducer, withAutoPlay } from './gameReducer';
+import { applyMove, createInitialState, gameReducer } from './gameReducer';
 import { applyMoveToBoard, getAllLegalMoves, hasAnyLegalMove, pieceCaptureMoves } from './rules';
 import type { Board, GameState, Position } from './types';
 
@@ -70,8 +70,6 @@ describe('multi-jump continuation', () => {
     board = place(board, { row: 1, col: 1 }, 'black'); // further capture option A
     board = place(board, { row: 1, col: 3 }, 'black'); // further capture option B
 
-    // Two capture options exist at turn start, so nothing auto-plays yet -- the
-    // click-to-select-then-click-to-move flow below reflects real interaction.
     let state = baseState(board);
     state = gameReducer(state, { type: 'SELECT_SQUARE', position: { row: 4, col: 4 } });
     state = gameReducer(state, { type: 'SELECT_SQUARE', position: { row: 2, col: 2 } });
@@ -131,10 +129,18 @@ describe('promotion', () => {
     // (2,0) next -- that direction only becomes legal once it is a king.
     let state = baseState(board, 'red');
     state = gameReducer(state, { type: 'SELECT_SQUARE', position: { row: 2, col: 4 } });
-    // Landing on (0,2) promotes the man to a king; since that leaves exactly one
-    // further capture, the reducer auto-plays the rest of the chain immediately.
+    // Landing on (0,2) promotes the man to a king. Even though exactly one further
+    // capture exists, it is NOT auto-played -- the chain stays open, waiting for
+    // an explicit click on the (single, highlighted) continuation.
     state = gameReducer(state, { type: 'SELECT_SQUARE', position: { row: 0, col: 2 } });
 
+    expect(state.mustContinueFrom).toEqual({ row: 0, col: 2 });
+    expect(state.currentPlayer).toBe('red');
+    expect(state.capturedCount.red).toBe(1);
+    expect(state.board[0][2]).toEqual({ color: 'red', kind: 'king' });
+
+    // Clicking the forced continuation completes the chain.
+    state = gameReducer(state, { type: 'SELECT_SQUARE', position: { row: 2, col: 0 } });
     expect(state.mustContinueFrom).toBeNull();
     expect(state.currentPlayer).toBe('black');
     expect(state.capturedCount.red).toBe(2);
@@ -265,39 +271,48 @@ describe('no-op click', () => {
   });
 });
 
-// --- Only one legal move exists (auto-play) ------------------------------------
-describe('auto-play on a single legal move', () => {
-  it('plays the sole legal move at the start of a turn without a click', () => {
+// --- Only one legal move exists (no auto-play) ----------------------------------
+describe('a single legal move/continuation is never auto-played', () => {
+  it('does not move the sole legal piece until its destination is explicitly clicked', () => {
     let board = createEmptyBoard();
     board = place(board, { row: 7, col: 0 }, 'red'); // only (6,1) is open
-    // Black has two independent pieces (more than one legal move) so its turn
-    // does not itself auto-play -- isolating the assertion to red's forced move.
     board = place(board, { row: 0, col: 3 }, 'black');
     board = place(board, { row: 0, col: 7 }, 'black');
 
-    const state = baseState(board, 'red');
-    const next = withAutoPlay(state);
+    let state = baseState(board, 'red');
+    state = gameReducer(state, { type: 'SELECT_SQUARE', position: { row: 7, col: 0 } });
+    // Selecting the piece highlights its one legal destination but does not move it.
+    expect(state.selected).toEqual({ row: 7, col: 0 });
+    expect(state.board[7][0]).toEqual({ color: 'red', kind: 'man' });
+    expect(state.currentPlayer).toBe('red');
 
-    expect(next.board[7][0]).toBeNull();
-    expect(next.board[6][1]).toEqual({ color: 'red', kind: 'man' });
-    expect(next.currentPlayer).toBe('black');
-    expect(next.mustContinueFrom).toBeNull();
+    state = gameReducer(state, { type: 'SELECT_SQUARE', position: { row: 6, col: 1 } });
+    expect(state.board[7][0]).toBeNull();
+    expect(state.board[6][1]).toEqual({ color: 'red', kind: 'man' });
+    expect(state.currentPlayer).toBe('black');
   });
 
-  it('auto-plays an entire forced multi-jump chain with zero clicks', () => {
+  it('does not auto-continue a forced multi-jump -- each jump needs its own click', () => {
     let board = createEmptyBoard();
     board = place(board, { row: 4, col: 4 }, 'red', 'king');
     board = place(board, { row: 3, col: 3 }, 'black'); // the only first-jump option
     board = place(board, { row: 1, col: 1 }, 'black'); // the only further capture
-    // Two spare black pieces (more than one legal move) so black's own turn does
-    // not also auto-play -- isolating the assertion to red's forced chain.
     board = place(board, { row: 0, col: 5 }, 'black');
     board = place(board, { row: 0, col: 7 }, 'black');
 
-    // Both jumps in this chain are individually forced (each is the sole legal
-    // move/continuation), so the whole chain should play out with no clicks at all.
-    const state = withAutoPlay(baseState(board));
+    let state = baseState(board);
+    state = gameReducer(state, { type: 'SELECT_SQUARE', position: { row: 4, col: 4 } });
+    state = gameReducer(state, { type: 'SELECT_SQUARE', position: { row: 2, col: 2 } });
 
+    // The first jump landed, but the forced second jump has NOT happened yet --
+    // the turn stays open on the same piece, waiting for its own click.
+    expect(state.mustContinueFrom).toEqual({ row: 2, col: 2 });
+    expect(state.currentPlayer).toBe('red');
+    expect(state.capturedCount.red).toBe(1);
+    expect(state.board[1][1]).not.toBeNull();
+
+    // Clicking the (single, highlighted) continuation completes the chain.
+    state = gameReducer(state, { type: 'SELECT_SQUARE', position: { row: 0, col: 0 } });
     expect(state.mustContinueFrom).toBeNull();
     expect(state.currentPlayer).toBe('black');
     expect(state.capturedCount.red).toBe(2);

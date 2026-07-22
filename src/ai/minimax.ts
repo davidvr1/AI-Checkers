@@ -61,12 +61,13 @@ function budgetExceeded(ctx: SearchContext): boolean {
  * set), not a move that hands the turn to the opponent.
  *
  * This is the one subtlety of the whole search: a full turn is one ply, not one
- * jump. Deliberately checked against the *immediate*, non-auto-played result of
- * `applyMove` -- a bulk-resolved (`withAutoPlay`) result can't be used here, since
- * it may chain through an arbitrary number of real turn-passes (e.g. the opponent
- * being forced into a single reply, which itself may free a further forced reply,
- * and so on). Collapsing all of that into a single depth/side step would corrupt
- * the ply count. Instead, every move -- forced or chosen -- gets its own recursive
+ * jump. Deliberately checked against the *immediate*, single-step result of
+ * `applyMove` -- a hypothetical bulk-resolved result (chaining through every
+ * forced reply until a real choice or turn-pass) can't be used here, since it may
+ * span an arbitrary number of real turn-passes (e.g. the opponent being forced
+ * into a single reply, which itself may free a further forced reply, and so on).
+ * Collapsing all of that into a single depth/side step would corrupt the ply
+ * count. Instead, every move -- forced or chosen -- gets its own recursive
  * step below, so a chain of forced single-choice replies naturally decrements
  * depth and flips sides once per real turn-pass, exactly as it should.
  */
@@ -136,9 +137,9 @@ function search(
 
 /**
  * Chooses the best move for `state.currentPlayer` via alpha-beta search to `depth`
- * plies. Only ever called when there is a real choice (currentLegalMoves has more
- * than one option) -- a forced single move/continuation is handled by the existing
- * `withAutoPlay` before the AI is ever consulted.
+ * plies. Called on every AI turn/continuation, even a forced single move -- there
+ * is no silent auto-play; the app always shows a visible "thinking" turn. When
+ * there is only one legal option this is a cheap O(1) return, no search needed.
  */
 export function chooseAiMove(state: GameState, depth: number): Move {
   const moves = currentLegalMoves(state);

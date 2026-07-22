@@ -79,9 +79,6 @@ export function StatusBar({ state, opponentLabel, aiThinking }: StatusBarProps) 
           </span>{' '}
           Legal destination
         </div>
-        <div className="legend-item">
-          <span className="legend-swatch auto">1</span> Auto-played when it's the only legal move
-        </div>
       </div>
     </div>
   );
