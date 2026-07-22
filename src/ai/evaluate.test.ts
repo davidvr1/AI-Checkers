@@ -12,6 +12,7 @@ function wonState(winner: PieceColor): GameState {
     turnsSinceCapture: 0,
     capturedCount: { red: 0, black: 0 },
     status: { type: 'won', winner },
+    history: [],
   };
 }
 
@@ -24,6 +25,7 @@ function materialState(board: Board): GameState {
     turnsSinceCapture: 0,
     capturedCount: { red: 0, black: 0 },
     status: { type: 'in-progress' },
+    history: [],
   };
 }
 

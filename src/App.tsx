@@ -1,15 +1,22 @@
-import { useEffect, useReducer, useState } from 'react';
+import { useEffect, useReducer, useRef, useState } from 'react';
 import { chooseAiMove, DIFFICULTY_DEPTH } from './ai/minimax';
 import { Board } from './components/Board';
 import { GameSetup } from './components/GameSetup';
 import { StatusBar } from './components/StatusBar';
 import { capitalize } from './format';
 import { createInitialState, gameReducer } from './game/gameReducer';
-import type { GameConfig, PieceColor, Position } from './game/types';
+import { formatLogEntry } from './game/moveLog';
+import type { GameConfig, MoveLogEntry, PieceColor, Position } from './game/types';
 
 /** A short pause before the AI actually computes, so "AI is thinking" reads as real
  * even on a forced move where there's nothing to search. */
 const AI_THINK_DELAY_MS = 400;
+
+declare global {
+  interface Window {
+    __checkersMoveLog?: MoveLogEntry[];
+  }
+}
 
 interface GameScreenProps {
   config: GameConfig;
@@ -22,6 +29,30 @@ function GameScreen({ config, onNewGame }: GameScreenProps) {
   const aiConfig = config.mode === 'ai' ? config : null;
   const aiColor: PieceColor | null = aiConfig ? (aiConfig.humanColor === 'red' ? 'black' : 'red') : null;
   const isAiTurn = aiColor !== null && state.status.type === 'in-progress' && state.currentPlayer === aiColor;
+
+  // Each fresh game starts its own window-visible log -- a previous game's
+  // entries shouldn't linger and mix into this one's audit trail.
+  useEffect(() => {
+    window.__checkersMoveLog = [];
+  }, []);
+
+  // Prints each newly-committed move (and why any piece was removed) to the
+  // console and accumulates it on window.__checkersMoveLog for later audit --
+  // e.g. checking that no illogical move slipped through. Keyed off history's
+  // length (not the dispatch itself) so it only ever fires once per real,
+  // committed move -- immune to React StrictMode's dev-only double-invocation
+  // of the reducer, and to the AI's internal search, which never touches this
+  // component's committed state at all.
+  const loggedCountRef = useRef(0);
+  useEffect(() => {
+    for (let i = loggedCountRef.current; i < state.history.length; i++) {
+      const entry = state.history[i];
+      // eslint-disable-next-line no-console
+      console.log(`[checkers] ${formatLogEntry(entry)}`);
+      window.__checkersMoveLog?.push(entry);
+    }
+    loggedCountRef.current = state.history.length;
+  }, [state.history]);
 
   useEffect(() => {
     if (!aiConfig || !isAiTurn) return;
