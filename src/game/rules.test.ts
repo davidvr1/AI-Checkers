@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { createEmptyBoard, createInitialBoard, setPiece } from './board';
-import { applyMove, createInitialState, gameReducer } from './gameReducer';
-import { applyMoveToBoard, getAllLegalMoves, hasAnyLegalMove, pieceCaptureMoves } from './rules';
+import { createEmptyBoard, createInitialBoard, positionKey, setPiece } from './board';
+import { DRAW_TURN_LIMIT, applyMove, createInitialState, gameReducer } from './gameReducer';
+import { applyMoveToBoard, getAllLegalMoves, hasAnyLegalMove, pieceCaptureMoves, pieceSimpleMoves } from './rules';
 import type { Board, GameState, Position } from './types';
 
 function place(board: Board, pos: Position, color: 'red' | 'black', kind: 'man' | 'king' = 'man'): Board {
@@ -18,6 +18,7 @@ function baseState(board: Board, currentPlayer: 'red' | 'black' = 'red'): GameSt
     capturedCount: { red: 0, black: 0 },
     status: { type: 'in-progress' },
     history: [],
+    positionHistory: [positionKey(board, currentPlayer)],
   };
 }
 
@@ -185,13 +186,54 @@ describe('no legal moves', () => {
 });
 
 // --- Draw threshold -----------------------------------------------------------
+// Tested by directly seeding `turnsSinceCapture` near the limit rather than by
+// playing out dozens of real moves: a real non-capturing oscillation would also
+// trip the (separately tested) threefold-repetition draw long before reaching
+// this limit, since bouncing a piece between two squares repeats the whole-board
+// position every 4 half-moves. Each side gets a second, stationary king purely
+// so the board never satisfies the (separately tested) insufficient-material
+// draw regardless of where the moving kings are.
 describe('draw threshold', () => {
-  it('draws after 40 consecutive turns with no capture', () => {
+  function fourKingBoard(): Board {
     let board = createEmptyBoard();
     board = place(board, { row: 7, col: 0 }, 'red', 'king');
+    board = place(board, { row: 7, col: 2 }, 'red', 'king');
     board = place(board, { row: 0, col: 7 }, 'black', 'king');
+    board = place(board, { row: 0, col: 5 }, 'black', 'king');
+    return board;
+  }
 
+  it(`draws once turnsSinceCapture reaches the ${DRAW_TURN_LIMIT}-half-move limit`, () => {
+    let state = baseState(fourKingBoard(), 'red');
+    state = { ...state, turnsSinceCapture: DRAW_TURN_LIMIT - 1, positionHistory: [] };
+
+    state = applyMove(state, { from: { row: 7, col: 0 }, to: { row: 6, col: 1 } });
+
+    expect(state.turnsSinceCapture).toBe(DRAW_TURN_LIMIT);
+    expect(state.status).toEqual({ type: 'draw' });
+  });
+
+  it('stays in-progress the half-move before the limit', () => {
+    let state = baseState(fourKingBoard(), 'red');
+    state = { ...state, turnsSinceCapture: DRAW_TURN_LIMIT - 2, positionHistory: [] };
+
+    state = applyMove(state, { from: { row: 7, col: 0 }, to: { row: 6, col: 1 } });
+
+    expect(state.turnsSinceCapture).toBe(DRAW_TURN_LIMIT - 1);
+    expect(state.status).toEqual({ type: 'in-progress' });
+  });
+});
+
+// --- Threefold repetition ------------------------------------------------------
+describe('threefold repetition', () => {
+  it('draws when the same position (board + player to move) recurs a third time', () => {
+    let board = createEmptyBoard();
+    board = place(board, { row: 7, col: 0 }, 'red', 'king');
+    board = place(board, { row: 7, col: 2 }, 'red', 'king');
+    board = place(board, { row: 0, col: 7 }, 'black', 'king');
+    board = place(board, { row: 0, col: 5 }, 'black', 'king');
     let state = baseState(board, 'red');
+
     const redSquares = [{ row: 7, col: 0 }, { row: 6, col: 1 }];
     const blackSquares = [{ row: 0, col: 7 }, { row: 1, col: 6 }];
     let redMoveCount = 0;
@@ -208,16 +250,139 @@ describe('draw threshold', () => {
       else blackMoveCount++;
     }
 
-    for (let turn = 0; turn < 39; turn++) {
+    // The full board position (both kings' squares + whose turn it is) repeats
+    // every 4 half-moves: red-out, black-out, red-back, black-back returns to the
+    // exact starting layout with red to move again -- the 3rd occurrence lands
+    // after 8 half-moves (turns 0 and 4 recreate the start; the reducer's own
+    // pre-move state already counts as the 1st).
+    for (let turn = 0; turn < 7; turn++) {
       playOneOscillation();
       expect(state.status).toEqual({ type: 'in-progress' });
     }
 
-    expect(state.turnsSinceCapture).toBe(39);
     playOneOscillation();
-
-    expect(state.turnsSinceCapture).toBe(40);
     expect(state.status).toEqual({ type: 'draw' });
+  });
+});
+
+// --- Insufficient material -----------------------------------------------------
+describe('insufficient material', () => {
+  it('draws immediately once only one king remains on each side', () => {
+    let board = createEmptyBoard();
+    board = place(board, { row: 7, col: 0 }, 'red', 'king');
+    board = place(board, { row: 0, col: 7 }, 'black', 'king'); // same diagonal, but at the far corner: no landing square beyond it, so no capture is forced
+    const state = baseState(board, 'red');
+
+    const next = applyMove(state, { from: { row: 7, col: 0 }, to: { row: 6, col: 1 } });
+    expect(next.status).toEqual({ type: 'draw' });
+  });
+
+  it('does not draw while any side still has a man on the board', () => {
+    let board = createEmptyBoard();
+    board = place(board, { row: 7, col: 0 }, 'red', 'king');
+    board = place(board, { row: 0, col: 7 }, 'black', 'man');
+    const state = baseState(board, 'red');
+
+    const next = applyMove(state, { from: { row: 7, col: 0 }, to: { row: 6, col: 1 } });
+    expect(next.status).toEqual({ type: 'in-progress' });
+  });
+});
+
+// --- Flying kings ---------------------------------------------------------------
+describe('flying kings: simple moves', () => {
+  it('slides any distance along a clear diagonal, in any of the 4 directions', () => {
+    let board = createEmptyBoard();
+    board = place(board, { row: 4, col: 3 }, 'red', 'king');
+
+    const moves = pieceSimpleMoves(board, { row: 4, col: 3 });
+    const destinations = moves.map((m) => `${m.to.row},${m.to.col}`);
+
+    // Up-left: (3,2) (2,1) (1,0). Up-right: (3,4) (2,5) (1,6) (0,7).
+    // Down-left: (5,2) (6,1) (7,0). Down-right: (5,4) (6,5) (7,6).
+    expect(destinations.sort()).toEqual(
+      ['3,2', '2,1', '1,0', '3,4', '2,5', '1,6', '0,7', '5,2', '6,1', '7,0', '5,4', '6,5', '7,6'].sort(),
+    );
+  });
+
+  it('stops sliding at the first occupied square, in either color', () => {
+    let board = createEmptyBoard();
+    board = place(board, { row: 4, col: 3 }, 'red', 'king');
+    board = place(board, { row: 2, col: 1 }, 'black');
+
+    const moves = pieceSimpleMoves(board, { row: 4, col: 3 });
+    const upLeft = moves.filter((m) => m.to.row < 4 && m.to.col < 3);
+    expect(upLeft.map((m) => `${m.to.row},${m.to.col}`).sort()).toEqual(['3,2']); // (2,1) itself and beyond are unreachable
+  });
+});
+
+describe('flying kings: captures', () => {
+  it('offers every empty landing square beyond the captured piece, not just the nearest one', () => {
+    let board = createEmptyBoard();
+    board = place(board, { row: 7, col: 0 }, 'red', 'king');
+    board = place(board, { row: 4, col: 3 }, 'black');
+
+    const moves = pieceCaptureMoves(board, { row: 7, col: 0 }, 'red');
+    expect(moves).toEqual(
+      expect.arrayContaining([
+        { from: { row: 7, col: 0 }, to: { row: 3, col: 4 }, captured: { row: 4, col: 3 } },
+        { from: { row: 7, col: 0 }, to: { row: 2, col: 5 }, captured: { row: 4, col: 3 } },
+        { from: { row: 7, col: 0 }, to: { row: 1, col: 6 }, captured: { row: 4, col: 3 } },
+        { from: { row: 7, col: 0 }, to: { row: 0, col: 7 }, captured: { row: 4, col: 3 } },
+      ]),
+    );
+    expect(moves).toHaveLength(4);
+  });
+
+  it('cannot capture two pieces on the same line in one leg -- a second piece right behind the first blocks landing entirely', () => {
+    let board = createEmptyBoard();
+    board = place(board, { row: 7, col: 0 }, 'red', 'king');
+    board = place(board, { row: 4, col: 3 }, 'black');
+    board = place(board, { row: 3, col: 4 }, 'black'); // immediately behind the first -- no empty landing exists
+
+    const moves = pieceCaptureMoves(board, { row: 7, col: 0 }, 'red');
+    expect(moves).toEqual([]);
+  });
+
+  it('cannot jump its own piece', () => {
+    let board = createEmptyBoard();
+    board = place(board, { row: 7, col: 0 }, 'red', 'king');
+    board = place(board, { row: 4, col: 3 }, 'red');
+
+    const moves = pieceCaptureMoves(board, { row: 7, col: 0 }, 'red');
+    expect(moves).toEqual([]);
+  });
+});
+
+describe('a man may only capture an enemy king moving forward', () => {
+  it('allows a man to jump an enemy king in its forward direction', () => {
+    let board = createEmptyBoard();
+    board = place(board, { row: 3, col: 3 }, 'red', 'man'); // forward is toward row 0
+    board = place(board, { row: 2, col: 2 }, 'black', 'king');
+
+    const moves = pieceCaptureMoves(board, { row: 3, col: 3 }, 'red');
+    expect(moves).toEqual([
+      { from: { row: 3, col: 3 }, to: { row: 1, col: 1 }, captured: { row: 2, col: 2 } },
+    ]);
+  });
+
+  it('forbids a man from jumping an enemy king backward', () => {
+    let board = createEmptyBoard();
+    board = place(board, { row: 3, col: 3 }, 'red', 'man'); // forward is toward row 0
+    board = place(board, { row: 4, col: 4 }, 'black', 'king'); // behind the man
+
+    const moves = pieceCaptureMoves(board, { row: 3, col: 3 }, 'red');
+    expect(moves).toEqual([]);
+  });
+
+  it('still allows a man to jump an enemy MAN backward, unrestricted', () => {
+    let board = createEmptyBoard();
+    board = place(board, { row: 3, col: 3 }, 'red', 'man');
+    board = place(board, { row: 4, col: 4 }, 'black', 'man'); // behind the man
+
+    const moves = pieceCaptureMoves(board, { row: 3, col: 3 }, 'red');
+    expect(moves).toEqual([
+      { from: { row: 3, col: 3 }, to: { row: 5, col: 5 }, captured: { row: 4, col: 4 } },
+    ]);
   });
 });
 

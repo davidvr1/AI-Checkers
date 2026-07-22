@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createEmptyBoard, setPiece } from '../game/board';
+import { createEmptyBoard, positionKey, setPiece } from '../game/board';
 import { applyMove, createInitialState, currentLegalMoves } from '../game/gameReducer';
 import type { Board, GameState, PieceColor, PieceKind, Position } from '../game/types';
 import { DIFFICULTY_DEPTH, chooseAiMove } from './minimax';
@@ -18,6 +18,7 @@ function baseState(board: Board, currentPlayer: PieceColor = 'red'): GameState {
     capturedCount: { red: 0, black: 0 },
     status: { type: 'in-progress' },
     history: [],
+    positionHistory: [positionKey(board, currentPlayer)],
   };
 }
 
@@ -27,18 +28,22 @@ describe('chooseAiMove: prefers the more materially advantageous capture', () =>
     // so a literal "capture vs. non-capture" root choice can never occur -- if any
     // piece can capture, getAllLegalMoves excludes every non-capturing move. The
     // meaningful equivalent this codebase can actually produce is a choice *among*
-    // forced captures: here red has two independent single-jump captures on offer,
-    // one taking a man (worth 1) and one taking a king (worth 1.5). The AI should
-    // prefer the higher-value capture.
+    // forced captures: here red has two independent captures on offer, one taking
+    // a man (worth 1, single landing) and one taking a king (worth 1.5). The
+    // capturing king is a flying king, so it has two possible landing squares
+    // beyond the captured piece ((1,4) or (0,3)) -- 3 legal moves in total. The AI
+    // should prefer the higher-value capture (either landing nets the same
+    // material, so either is an acceptable answer, but ties keep the first-found
+    // move, which is the nearer landing).
     let board = createEmptyBoard();
     board = place(board, { row: 3, col: 0 }, 'red', 'man');
     board = place(board, { row: 2, col: 1 }, 'black', 'man'); // captured landing (1,2)
     board = place(board, { row: 3, col: 6 }, 'red', 'king');
-    board = place(board, { row: 2, col: 5 }, 'black', 'king'); // captured landing (1,4)
+    board = place(board, { row: 2, col: 5 }, 'black', 'king'); // captured, landing (1,4) or (0,3)
 
     const state = baseState(board, 'red');
     const moves = currentLegalMoves(state);
-    expect(moves).toHaveLength(2);
+    expect(moves).toHaveLength(3);
 
     const move = chooseAiMove(state, 2);
     expect(move).toEqual({
@@ -71,8 +76,10 @@ describe('chooseAiMove: takes an immediate winning move', () => {
 describe('chooseAiMove: same-ply multi-jump-choice recursion', () => {
   it('resolves a further-capture choice on the same turn rather than treating it as the opponent replying', () => {
     // Red king at (4,3) has two first-jump options:
-    //  A: capture the black KING at (3,2) -> land (2,1), chain ends there (worth +1.5).
-    //  B: capture the black MAN at (3,4) -> land (2,5), which leaves a further-capture
+    //  A: capture the black KING at (3,2), a flying king so it can land at either
+    //     (2,1) or (1,0); chain ends there either way (worth +1.5).
+    //  B: capture the black MAN at (3,4) -> land (2,5) (only one landing square,
+    //     since (1,6) beyond it is occupied), which leaves a further-capture
     //     *choice* (still red's own turn, not auto-played): either take the man at
     //     (1,4) [worth +1 more] or the king at (1,6) [worth +1.5 more].
     // Correctly resolving B's fork picks the king, so B totals +2.5 -- better than A's
@@ -84,14 +91,14 @@ describe('chooseAiMove: same-ply multi-jump-choice recursion', () => {
     // chosen.
     let board = createEmptyBoard();
     board = place(board, { row: 4, col: 3 }, 'red', 'king');
-    board = place(board, { row: 3, col: 2 }, 'black', 'king'); // move A's capture
+    board = place(board, { row: 3, col: 2 }, 'black', 'king'); // move A's capture, landing (2,1) or (1,0)
     board = place(board, { row: 3, col: 4 }, 'black', 'man'); // move B's first capture
     board = place(board, { row: 1, col: 4 }, 'black', 'man'); // B's fork option 1
     board = place(board, { row: 1, col: 6 }, 'black', 'king'); // B's fork option 2 (better)
 
     const state = baseState(board, 'red');
     const moves = currentLegalMoves(state);
-    expect(moves).toHaveLength(2);
+    expect(moves).toHaveLength(3);
 
     const move = chooseAiMove(state, 1);
     expect(move).toEqual({
@@ -106,19 +113,22 @@ describe('chooseAiMove: does not cut off a forced continuation at the depth hori
   it('resolves a still-in-progress forced multi-jump before evaluating, even at depth 0', () => {
     // Two independent red pieces, each with exactly one capture available (both
     // captures are mandatory since red has no non-capturing legal moves at all):
-    //  P1 (3,0): captures a KING directly (worth 1.5), chain ends there -- true value 1.5.
-    //  P2 (3,7): captures a MAN (worth 1), then has exactly one further FORCED
-    //    capture (not a fork -- a single continuation) taking a KING (worth 1.5)
-    //    -- true value 2.5, strictly better than P1's 1.5.
+    //  P1 (5,0): captures a KING directly, forward (worth 1.5), chain ends there -- true value 1.5.
+    //  P2 (5,7): captures a MAN, forward (worth 1), then has exactly one further FORCED
+    //    capture (not a fork -- a single continuation) taking a KING, also forward
+    //    (worth 1.5) -- true value 2.5, strictly better than P1's 1.5.
+    // Both jumps chain in the same forward direction (row-1 for red), since a man
+    // may only capture an enemy KING by jumping forward -- a backward king capture
+    // is illegal under house rules, so both continuations must stay forward here.
     // At depth 0, a naive cutoff that ignores an in-progress forced continuation
     // would evaluate P2's branch right after its first jump (value ~1, less than
     // P1's 1.5) and wrongly prefer P1. Resolving the guaranteed continuation
     // first (regardless of depth) correctly ranks P2 above P1.
     let board = createEmptyBoard();
-    board = place(board, { row: 3, col: 0 }, 'red', 'man');
-    board = place(board, { row: 2, col: 1 }, 'black', 'king');
-    board = place(board, { row: 3, col: 7 }, 'red', 'man');
-    board = place(board, { row: 2, col: 6 }, 'black', 'man');
+    board = place(board, { row: 5, col: 0 }, 'red', 'man');
+    board = place(board, { row: 4, col: 1 }, 'black', 'king');
+    board = place(board, { row: 5, col: 7 }, 'red', 'man');
+    board = place(board, { row: 4, col: 6 }, 'black', 'man');
     board = place(board, { row: 2, col: 4 }, 'black', 'king');
 
     const state = baseState(board, 'red');
@@ -126,7 +136,7 @@ describe('chooseAiMove: does not cut off a forced continuation at the depth hori
     expect(moves).toHaveLength(2);
 
     const move = chooseAiMove(state, 0);
-    expect(move).toEqual({ from: { row: 3, col: 7 }, to: { row: 1, col: 5 }, captured: { row: 2, col: 6 } });
+    expect(move).toEqual({ from: { row: 5, col: 7 }, to: { row: 3, col: 5 }, captured: { row: 4, col: 6 } });
   });
 });
 

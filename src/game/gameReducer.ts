@@ -1,13 +1,22 @@
-import { createInitialBoard, isOnBoard, samePosition } from './board';
+import { createInitialBoard, isOnBoard, positionKey, samePosition } from './board';
 import { buildLogEntry } from './moveLog';
-import { applyMoveToBoard, getAllLegalMoves, hasAnyLegalMove, pieceCaptureMoves } from './rules';
+import {
+  applyMoveToBoard,
+  getAllLegalMoves,
+  hasAnyLegalMove,
+  isInsufficientMaterial,
+  pieceCaptureMoves,
+} from './rules';
 import type { Action, GameState, Move, Position } from './types';
 
-export const DRAW_TURN_LIMIT = 40;
+/** Combined half-move count (both players) with no capture before it's a draw --
+ * the page's "50 consecutive moves without a change in piece count" rule. */
+export const DRAW_TURN_LIMIT = 50;
 
 export function createInitialState(): GameState {
+  const board = createInitialBoard();
   return {
-    board: createInitialBoard(),
+    board,
     currentPlayer: 'red',
     selected: null,
     mustContinueFrom: null,
@@ -15,6 +24,7 @@ export function createInitialState(): GameState {
     capturedCount: { red: 0, black: 0 },
     status: { type: 'in-progress' },
     history: [],
+    positionHistory: [positionKey(board, 'red')],
   };
 }
 
@@ -61,12 +71,17 @@ export function applyMove(state: GameState, move: Move): GameState {
   const nextPlayer = state.currentPlayer === 'red' ? 'black' : 'red';
   const turnsSinceCapture = madeCapture ? 0 : state.turnsSinceCapture + 1;
 
-  const status: GameState['status'] =
-    turnsSinceCapture >= DRAW_TURN_LIMIT
+  // A position from before a capture can never recur once the piece count has
+  // changed, so a capture resets the tracked history instead of just appending.
+  const nextKey = positionKey(nextBoard, nextPlayer);
+  const positionHistory = madeCapture ? [nextKey] : [...state.positionHistory, nextKey];
+  const repeated3Times = positionHistory.filter((key) => key === nextKey).length >= 3;
+
+  const status: GameState['status'] = !hasAnyLegalMove(nextBoard, nextPlayer)
+    ? { type: 'won', winner: state.currentPlayer }
+    : turnsSinceCapture >= DRAW_TURN_LIMIT || repeated3Times || isInsufficientMaterial(nextBoard)
       ? { type: 'draw' }
-      : hasAnyLegalMove(nextBoard, nextPlayer)
-        ? { type: 'in-progress' }
-        : { type: 'won', winner: state.currentPlayer };
+      : { type: 'in-progress' };
 
   return {
     ...state,
@@ -76,6 +91,7 @@ export function applyMove(state: GameState, move: Move): GameState {
     mustContinueFrom: null,
     capturedCount,
     turnsSinceCapture,
+    positionHistory,
     status,
   };
 }

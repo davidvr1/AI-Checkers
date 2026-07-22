@@ -7,9 +7,10 @@ export function createEmptyBoard(): Board {
 }
 
 /**
- * Standard American/English draughts starting position: 12 men per side on the
- * dark squares of the three rows closest to each player. Black occupies rows 0-2,
- * red occupies rows 5-7, matching the approved board sketch.
+ * Standard 8x8 draughts starting position (shared by American/English and
+ * Israeli/international rules): 12 men per side on the dark squares of the three
+ * rows closest to each player. Black occupies rows 0-2, red occupies rows 5-7,
+ * matching the approved board sketch.
  */
 export function createInitialBoard(): Board {
   const board = createEmptyBoard();
@@ -48,6 +49,22 @@ export function setPiece(board: Board, pos: Position, piece: Square): Board {
   const next = board.map((row) => row.slice());
   next[pos.row][pos.col] = piece;
   return next;
+}
+
+/**
+ * A compact string uniquely identifying a board layout plus whose turn it is --
+ * two states are "the same position" for repetition purposes iff their keys match.
+ * Deliberately cheap (no JSON.stringify): called on every real turn-pass, including
+ * from inside the AI's search on hypothetical future positions.
+ */
+export function positionKey(board: Board, player: PieceColor): string {
+  let key = player === 'red' ? 'R' : 'B';
+  for (const row of board) {
+    for (const square of row) {
+      key += square ? (square.color === 'red' ? 'r' : 'b') + (square.kind === 'king' ? 'K' : 'm') : '.';
+    }
+  }
+  return key;
 }
 
 export function enumeratePieces(board: Board, color: PieceColor): Position[] {

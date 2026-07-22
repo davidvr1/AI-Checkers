@@ -62,12 +62,19 @@ export interface GameState {
   selected: Position | null;
   /** Set while a multi-jump chain is in progress: only this piece may move, and only by capturing. */
   mustContinueFrom: Position | null;
-  /** Consecutive completed turns (both players combined) with no capture; draw at 40. */
+  /** Consecutive completed turns (both players combined) with no capture; see DRAW_TURN_LIMIT. */
   turnsSinceCapture: number;
   capturedCount: CapturedCount;
   status: GameStatus;
   /** Every move actually played so far, oldest first. See MoveLogEntry. */
   history: MoveLogEntry[];
+  /**
+   * Position keys (see `positionKey`) for every full-turn boundary since the last
+   * capture, oldest first, used to detect threefold-repetition draws. Reset (not
+   * appended to) on a capture, since a position from before a capture can never
+   * recur once the piece count has changed.
+   */
+  positionHistory: string[];
 }
 
 export type GameMode = 'human' | 'ai';
