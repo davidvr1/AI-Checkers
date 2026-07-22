@@ -14,7 +14,7 @@ baseline_commit: 'b3959074430eaf24cd9122671c2d9908942e5fc1'
 
 **Problem:** The repository has no functioning checkers game; there is currently no way for two people to play a full game of checkers together.
 
-**Approach:** Build a browser-playable React + TypeScript (Vite) website implementing an 8x8 checkers board with standard American/English draughts rules, local two-player turn-based play (click-to-select, click-to-move, with single-forced-move auto-play), and win/draw detection. The move-input layer is decoupled from the rules engine so an AI/PC opponent or online multiplayer can be added later without reworking the rules or board logic.
+**Approach:** Build a browser-playable React + TypeScript (Vite) website implementing an 8x8 checkers board with standard American/English draughts rules, local two-player turn-based play (click-to-select, click-to-move -- every move, including a forced single one, requires an explicit click), and win/draw detection. The move-input layer is decoupled from the rules engine so an AI/PC opponent or online multiplayer can be added later without reworking the rules or board logic.
 
 ## Boundaries & Constraints
 
@@ -22,7 +22,7 @@ baseline_commit: 'b3959074430eaf24cd9122671c2d9908942e5fc1'
 - Standard 8x8 board, 12 pieces per side on dark squares, starting in the standard checkers layout.
 - Men move diagonally forward one square onto an empty dark square; captures jump diagonally over an adjacent opponent piece into the empty square beyond.
 - Captures are mandatory whenever at least one is available to the player to move; if a piece captures and can capture again immediately, the same piece must continue capturing before the turn ends.
-- Whenever the player to move (or an in-progress multi-jump) has exactly one legal move available in total, the app plays it automatically without waiting for a click.
+- No move is ever auto-played, even when it is the only legal option -- not at the start of a turn, and not mid multi-jump. The player to move (human or AI) must always take an explicit action (a click, or the AI's own turn-taking cycle) for every single move.
 - A man that reaches the opponent's back row is promoted to a king; kings may move/capture diagonally forward or backward.
 - A player with no legal move on their turn (no pieces, or all pieces blocked) loses.
 - If 40 consecutive full-turns pass with no capture, the game ends in a draw.
@@ -47,9 +47,13 @@ baseline_commit: 'b3959074430eaf24cd9122671c2d9908942e5fc1'
 | No legal moves | Player to move has no legal move | Game ends; opponent shown as winner | N/A |
 | Draw threshold | 40 consecutive turns pass with no capture | Game ends; result shown as draw | N/A |
 | No-op click | Click empty square/opponent piece with nothing selected | No state change | N/A |
-| Only one legal move exists | Player to move (or a piece mid multi-jump) has exactly one legal move/continuation | Move executes immediately, no click required | N/A |
+| Only one legal move exists | Player to move (or a piece mid multi-jump) has exactly one legal move/continuation | Destination is highlighted like any other legal move; the player must still click it -- no auto-play | N/A |
 
 </frozen-after-approval>
+
+## Spec Change Log
+
+- **2026-07-22, human-initiated renegotiation:** Removed the single-legal-move auto-play rule entirely (was: "the app plays it automatically without waiting for a click"). Reason: user explicitly wants to click through every move, including forced ones, with no exceptions -- confirmed to apply at turn-start, mid multi-jump, and to the AI opponent's own turns as well (see `spec-checkers-ai-opponent.md`'s equivalent rule and its Spec Change Log). `withAutoPlay` was removed from `gameReducer.ts`; every move now requires one explicit action (a click, or the AI's turn-taking cycle) per atomic step.
 
 ## Code Map
 
@@ -60,7 +64,7 @@ baseline_commit: 'b3959074430eaf24cd9122671c2d9908942e5fc1'
 - `src/game/types.ts` -- core types: `Piece`, `Position`, `SquareState`, `Board`, `Move`, `GameState`
 - `src/game/board.ts` -- initial board construction, board query/update helpers
 - `src/game/rules.ts` -- legal move + mandatory-capture generation, multi-jump chaining, promotion, win/draw detection
-- `src/game/gameReducer.ts` -- reducer exposing a single `applyMove(state, move)` entry point; drives `SELECT_SQUARE` actions through it and auto-plays any turn/continuation with exactly one legal move
+- `src/game/gameReducer.ts` -- reducer exposing a single `applyMove(state, move)` entry point; drives `SELECT_SQUARE` actions through it, one explicit move at a time (no auto-play, even for a forced single move)
 - `src/components/Board.tsx` -- renders 8x8 grid, forwards square clicks to reducer
 - `src/components/Square.tsx` -- single square (color, highlight, contains Piece)
 - `src/components/Piece.tsx` -- piece rendering (color, man vs king)
@@ -93,7 +97,7 @@ baseline_commit: 'b3959074430eaf24cd9122671c2d9908942e5fc1'
 
 Represent the board as a flat array or 2D array keyed by `{row, col}` (0-7), tracking only the 32 playable dark squares logically. Keep `rules.ts` pure (board + player in, list of legal `Move`s out) so it is directly unit-testable without React. The reducer owns transient turn state: `selectedPosition`, `mustContinueCaptureFrom` (Position | null), and `turnsSinceLastCapture` (for the draw rule).
 
-Extensibility seam: the reducer's only way to change the board is `applyMove(state, move)`, and it always sources `move` the same way regardless of who "decided" it -- a human click resolving to one candidate move, or the auto-play path resolving the sole legal move. This spec only ever supplies moves from local human clicks, but that single-entry-point shape is what would let a later spec add an AI move-picker or a networked-move listener beside the click handler without touching `rules.ts` or the reducer's internals. No AI/network code is written now.
+Extensibility seam: the reducer's only way to change the board is `applyMove(state, move)`, and it always sources `move` the same way regardless of who "decided" it -- a human click resolving to one candidate move, or (per the later AI spec) a search result resolving to one. This spec only ever supplies moves from local human clicks, but that single-entry-point shape is what would let a later spec add an AI move-picker or a networked-move listener beside the click handler without touching `rules.ts` or the reducer's internals. No AI/network code is written now.
 
 ## Verification
 

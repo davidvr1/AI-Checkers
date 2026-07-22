@@ -23,7 +23,7 @@ baseline_commit: '848aea73d2155d6023d2df85beae61625473b5f2'
 - In "vs AI", the human picks Red or Black; the AI takes the other color.
 - Difficulty (Easy/Medium/Hard) maps to a fixed minimax search depth (Easy < Medium < Hard); depth is chosen so a move typically resolves in well under 2 seconds.
 - The AI's search treats one full turn as one ply for alternating sides: if a chosen move leaves the same player facing a further capture *choice* (not a forced single continuation), the search recurses at the same depth and same maximizing/minimizing side; depth only decrements when the turn actually passes to the other player.
-- Whenever the player to move (human or AI) has exactly one legal move/continuation, the existing `withAutoPlay` auto-play still handles it with no minimax call -- the AI's search only runs when there is a real choice.
+- No move is ever auto-played, for either player -- not at turn-start, not mid multi-jump. When the AI has exactly one legal move/continuation, `chooseAiMove` still runs (as a cheap O(1) return, no search needed) and still goes through the same visible "AI is thinking" turn as a real decision; it is never skipped.
 - While the AI is deciding a move, board input is disabled and the StatusBar shows an "AI is thinking" state.
 - AI moves apply through the existing `applyMove` entry point via a new `PLAY_MOVE` action, not through simulated clicks.
 - A "New Game" control returns to the setup screen from either mode at any time.
@@ -38,7 +38,7 @@ baseline_commit: '848aea73d2155d6023d2df85beae61625473b5f2'
 | Scenario | Input / State | Expected Output / Behavior | Error Handling |
 |----------|--------------|---------------------------|----------------|
 | Start vs AI as Black | Human picks Black + a difficulty, starts game | AI (Red) computes and plays the opening move immediately | N/A |
-| AI turn, single forced move | AI to move, exactly one legal move/continuation | Auto-plays via existing `withAutoPlay`; no search runs | N/A |
+| AI turn, single forced move | AI to move, exactly one legal move/continuation | Still goes through the visible "AI is thinking" turn (no silent skip); `chooseAiMove` returns immediately with no search | N/A |
 | AI turn, real choice | AI to move, more than one legal move | Board input disabled, "AI is thinking" shown, minimax picks and plays a move (resolving any further multi-jump choices itself) before re-enabling input | N/A |
 | Human clicks during AI's turn | Click while AI is deciding | No-op; board is disabled | N/A |
 | Game ends in vs AI mode | Win/draw condition reached | Same lockout and StatusBar result as vs Human; "New Game" still available | N/A |
@@ -48,7 +48,7 @@ baseline_commit: '848aea73d2155d6023d2df85beae61625473b5f2'
 ## Code Map
 
 - `src/game/types.ts` -- add `GameMode` ('human' \| 'ai'), `Difficulty` ('easy' \| 'medium' \| 'hard'), and a `PLAY_MOVE` variant on `Action`
-- `src/game/gameReducer.ts` -- handle `PLAY_MOVE` by calling `withAutoPlay(applyMove(state, move))`, identical post-processing to a human move
+- `src/game/gameReducer.ts` -- handle `PLAY_MOVE` by calling `applyMove(state, move)`, identical post-processing to a human move (no auto-play for either)
 - `src/ai/evaluate.ts` -- static board evaluation: material with king weight, from a given color's perspective; +/-Infinity-ish for won/draw terminal states
 - `src/ai/minimax.ts` -- alpha-beta search choosing the best move for the player to move at a given depth, honoring the same-ply multi-jump-choice recursion rule above; exports `DIFFICULTY_DEPTH` map and `chooseAiMove(state, depth)`
 - `src/ai/minimax.test.ts` -- unit tests for search correctness (prefers captures/wins, resolves multi-jump choices, respects depth)
@@ -61,7 +61,7 @@ baseline_commit: '848aea73d2155d6023d2df85beae61625473b5f2'
 
 **Execution:**
 - [x] `src/game/types.ts` -- add `GameMode`, `Difficulty`, and the `PLAY_MOVE` action variant -- shared vocabulary for setup and AI
-- [x] `src/game/gameReducer.ts` -- handle `PLAY_MOVE` through `applyMove` + `withAutoPlay` -- reuses the extensibility seam as designed, no rules changes
+- [x] `src/game/gameReducer.ts` -- handle `PLAY_MOVE` through `applyMove` -- reuses the extensibility seam as designed, no rules changes (later renegotiated to drop auto-play entirely, see Spec Change Log)
 - [x] `src/ai/evaluate.ts` -- material + king-weighted evaluation with terminal-state scoring -- the search's objective function
 - [x] `src/ai/minimax.ts` -- alpha-beta search over `currentLegalMoves`/`applyMove`, same-ply recursion for multi-jump choices, `DIFFICULTY_DEPTH` map -- the AI's decision engine
 - [x] `src/ai/minimax.test.ts` -- unit tests per the Edge-Case Matrix plus a same-ply multi-jump-choice regression -- locks in search correctness
@@ -75,9 +75,13 @@ baseline_commit: '848aea73d2155d6023d2df85beae61625473b5f2'
 - Given it is the AI's turn with more than one legal move, when the AI decides, then board input is disabled until the AI's full turn (including any multi-jump choices) completes.
 - Given a game in either mode reaches a win or draw, when it ends, then the same lockout/result UI applies and "New Game" returns to the setup screen.
 
+## Spec Change Log
+
+- **2026-07-22, human-initiated renegotiation:** Removed the single-legal-move auto-play rule entirely, matching the same renegotiation in `spec-checkers-game.md`. The AI's `chooseAiMove`/`withAutoPlay`-skip-guard combination (previously: skip the search and let `withAutoPlay` silently resolve a forced move) is replaced by always running `chooseAiMove` (its own `length===1` fast path avoids wasting a search) and always showing the visible "AI is thinking" turn. `withAutoPlay` was deleted from `gameReducer.ts`.
+
 ## Design Notes
 
-The same-ply recursion is the one non-obvious piece: at a state where `currentLegalMoves(state).length > 1`, for each candidate move compute `next = applyMove(state, move)`. If `next.currentPlayer === state.currentPlayer` (a further capture choice, not auto-played because it wasn't the sole option), recurse into `next` at the *same* depth and same maximizing side -- it's still the same turn. Only when `next.currentPlayer !== state.currentPlayer` (or the game ended) does depth decrement and the maximizing side flip. `withAutoPlay` is still applied to `next` before recursing, so any trailing single-choice continuations are absorbed automatically and never cost search depth.
+The same-ply recursion is the one non-obvious piece: at a state where `currentLegalMoves(state).length > 1`, for each candidate move compute `next = applyMove(state, move)`. If `next.currentPlayer === state.currentPlayer` (a further capture choice, not the sole option), recurse into `next` at the *same* depth and same maximizing side -- it's still the same turn. Only when `next.currentPlayer !== state.currentPlayer` (or the game ended) does depth decrement and the maximizing side flip. Every move inside the search -- forced or chosen -- is applied one atomic step at a time via `applyMove` alone; the search never bulk-resolves a chain, which keeps its ply-counting exact regardless of how the outer game loop handles (or, since the 2026-07-22 renegotiation, doesn't handle) auto-play.
 
 Evaluation: score = (ownMen + ownKings * 1.5) - (oppMen + oppKings * 1.5) from the AI's own color's perspective; a won state scores a large constant (e.g. 10000) adjusted by sign for winner, a draw scores 0. Keep it this simple for v1 -- no mobility/positional terms unless Easy/Hard turn out indistinguishable in practice.
 

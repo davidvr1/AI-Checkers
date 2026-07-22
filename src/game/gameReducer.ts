@@ -88,20 +88,6 @@ function sameMove(a: Move, b: Move): boolean {
   );
 }
 
-/**
- * Repeatedly auto-plays the sole legal move whenever the player to move (or an
- * in-progress multi-jump) has exactly one legal move/continuation available.
- */
-export function withAutoPlay(state: GameState): GameState {
-  let current = state;
-  while (current.status.type === 'in-progress') {
-    const moves = currentLegalMoves(current);
-    if (moves.length !== 1) break;
-    current = applyMove(current, moves[0]);
-  }
-  return current;
-}
-
 function handleSelectSquare(state: GameState, position: Position): GameState {
   if (state.status.type !== 'in-progress') return state;
   if (!isOnBoard(position)) return state;
@@ -109,7 +95,7 @@ function handleSelectSquare(state: GameState, position: Position): GameState {
   if (state.mustContinueFrom) {
     const moves = pieceCaptureMoves(state.board, state.mustContinueFrom, state.currentPlayer);
     const move = moves.find((m) => samePosition(m.to, position));
-    return move ? withAutoPlay(applyMove(state, move)) : state;
+    return move ? applyMove(state, move) : state;
   }
 
   const legalMoves = getAllLegalMoves(state.board, state.currentPlayer);
@@ -122,7 +108,7 @@ function handleSelectSquare(state: GameState, position: Position): GameState {
       (m) => samePosition(m.from, state.selected!) && samePosition(m.to, position),
     );
     if (move) {
-      return withAutoPlay(applyMove(state, move));
+      return applyMove(state, move);
     }
   }
 
@@ -144,7 +130,7 @@ export function gameReducer(state: GameState, action: Action): GameState {
     case 'PLAY_MOVE': {
       if (state.status.type !== 'in-progress') return state;
       const legalMove = currentLegalMoves(state).find((m) => sameMove(m, action.move));
-      return legalMove ? withAutoPlay(applyMove(state, legalMove)) : state;
+      return legalMove ? applyMove(state, legalMove) : state;
     }
     default:
       return state;

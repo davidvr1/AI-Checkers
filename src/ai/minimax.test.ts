@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createEmptyBoard, setPiece } from '../game/board';
-import { applyMove, createInitialState, currentLegalMoves, withAutoPlay } from '../game/gameReducer';
+import { applyMove, createInitialState, currentLegalMoves } from '../game/gameReducer';
 import type { Board, GameState, PieceColor, PieceKind, Position } from '../game/types';
 import { DIFFICULTY_DEPTH, chooseAiMove } from './minimax';
 
@@ -149,16 +149,20 @@ describe('chooseAiMove: respects the configured depth', () => {
     let state = createInitialState();
     const depth = DIFFICULTY_DEPTH.hard;
     let guard = 0;
+    // No auto-play: every atomic jump (including each step of a forced multi-jump
+    // chain) is its own loop iteration now, mirroring the real PLAY_MOVE reducer
+    // path (applyMove alone). A generous guard accounts for that -- a full game
+    // still terminates in well under this bound.
+    const MAX_ATOMIC_MOVES = 800;
 
-    while (state.status.type === 'in-progress' && guard < 200) {
+    while (state.status.type === 'in-progress' && guard < MAX_ATOMIC_MOVES) {
       const legalMoves = currentLegalMoves(state);
       const move = chooseAiMove(state, depth);
       expect(legalMoves).toContainEqual(move);
-      // Mirrors the PLAY_MOVE reducer path: applyMove + withAutoPlay.
-      state = withAutoPlay(applyMove(state, move));
+      state = applyMove(state, move);
       guard++;
     }
 
-    expect(guard).toBeLessThan(200); // the game actually terminated
+    expect(guard).toBeLessThan(MAX_ATOMIC_MOVES); // the game actually terminated
   });
 });
