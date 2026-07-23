@@ -77,12 +77,13 @@ export interface GameState {
   positionHistory: string[];
 }
 
-export type GameMode = 'human' | 'ai';
+export type GameMode = 'human' | 'ai' | 'online';
 export type Difficulty = 'easy' | 'medium' | 'hard';
 
 export type GameConfig =
   | { mode: 'human' }
-  | { mode: 'ai'; humanColor: PieceColor; difficulty: Difficulty };
+  | { mode: 'ai'; humanColor: PieceColor; difficulty: Difficulty }
+  | { mode: 'online' };
 
 export type Action =
   | { type: 'SELECT_SQUARE'; position: Position }

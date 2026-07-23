@@ -3,6 +3,7 @@ import { chooseAiMove, DIFFICULTY_DEPTH } from './ai/minimax';
 import { Board } from './components/Board';
 import { GameSetup } from './components/GameSetup';
 import { LanguageToggle } from './components/LanguageToggle';
+import { OnlineGameScreen } from './components/OnlineGameScreen';
 import { StatusBar } from './components/StatusBar';
 import { createInitialState, gameReducer } from './game/gameReducer';
 import { formatLogEntry } from './game/moveLog';
@@ -20,7 +21,8 @@ declare global {
 }
 
 interface GameScreenProps {
-  config: GameConfig;
+  /** Local (human or AI) game only -- the online mode has its own screen. */
+  config: Exclude<GameConfig, { mode: 'online' }>;
   onNewGame: () => void;
 }
 
@@ -112,13 +114,17 @@ function GameScreen({ config, onNewGame }: GameScreenProps) {
 export function App() {
   const [config, setConfig] = useState<GameConfig | null>(null);
 
+  const onNewGame = () => setConfig(null);
+
   return (
     <>
       <LanguageToggle />
-      {config ? (
-        <GameScreen config={config} onNewGame={() => setConfig(null)} />
-      ) : (
+      {config === null ? (
         <GameSetup onStart={setConfig} />
+      ) : config.mode === 'online' ? (
+        <OnlineGameScreen onNewGame={onNewGame} />
+      ) : (
+        <GameScreen config={config} onNewGame={onNewGame} />
       )}
     </>
   );

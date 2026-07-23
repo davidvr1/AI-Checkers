@@ -461,3 +461,47 @@ hr.rule {
   font-size: 15px;
   line-height: 1;
 }
+
+/* ---- Online multiplayer ---- */
+.setup-hint {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+
+.online-banner {
+  margin: var(--space-xs) 0 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--brass);
+  min-height: 1.2em;
+}
+
+.online-banner.error {
+  color: var(--garnet);
+}
+
+.board-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: min(72vw, 464px);
+  height: min(72vw, 464px);
+  color: var(--text-dim);
+  font-size: 15px;
+}
+
+.online-actions {
+  display: flex;
+  gap: var(--space-md);
+  align-items: center;
+  justify-content: center;
+  margin-top: var(--space-xs);
+}
+
+.setup-start.rematch {
+  margin-top: 0;
+  padding: 8px 16px;
+  font-size: 13px;
+}

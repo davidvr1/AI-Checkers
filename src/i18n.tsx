@@ -27,9 +27,22 @@ export interface Translations {
     mode: string;
     vsHuman: string;
     vsAi: string;
+    playOnline: string;
     yourColor: string;
     difficulty: string;
     startGame: string;
+    onlineHint: string;
+  };
+  online: {
+    eyebrow: string;
+    connecting: string;
+    connectionLost: string;
+    waitingForOpponent: string;
+    youArePlaying: (color: string) => string;
+    spectating: string;
+    yourTurn: string;
+    opponentTurn: string;
+    rematch: string;
   };
   status: {
     toMove: string;
@@ -65,9 +78,22 @@ const en: Translations = {
     mode: 'Mode',
     vsHuman: 'vs Human',
     vsAi: 'vs AI',
+    playOnline: 'Online',
     yourColor: 'Your color',
     difficulty: 'Difficulty',
     startGame: 'Start Game',
+    onlineHint: 'Two devices on the same WiFi play against each other. First to join is Red, second is Black.',
+  },
+  online: {
+    eyebrow: 'Online · same WiFi',
+    connecting: 'Connecting…',
+    connectionLost: 'Connection lost. Is the game server still running?',
+    waitingForOpponent: 'Waiting for an opponent to join…',
+    youArePlaying: (color) => `You are playing ${color}`,
+    spectating: 'Both seats are taken — you are watching.',
+    yourTurn: 'Your turn',
+    opponentTurn: "Opponent's turn",
+    rematch: 'Rematch',
   },
   status: {
     toMove: 'To move',
@@ -103,9 +129,22 @@ const he: Translations = {
     mode: 'מצב משחק',
     vsHuman: 'מול אדם',
     vsAi: 'מול מחשב',
+    playOnline: 'ברשת',
     yourColor: 'הצבע שלך',
     difficulty: 'רמת קושי',
     startGame: 'התחל משחק',
+    onlineHint: 'שני מכשירים באותה רשת WiFi משחקים זה נגד זה. הראשון שמצטרף משחק באדום, השני בשחור.',
+  },
+  online: {
+    eyebrow: 'ברשת · אותה WiFi',
+    connecting: 'מתחבר…',
+    connectionLost: 'החיבור אבד. האם שרת המשחק עדיין פועל?',
+    waitingForOpponent: 'ממתין ליריב שיצטרף…',
+    youArePlaying: (color) => `אתה משחק ב${color}`,
+    spectating: 'שני המקומות תפוסים — אתה צופה במשחק.',
+    yourTurn: 'תורך',
+    opponentTurn: 'תור היריב',
+    rematch: 'משחק חוזר',
   },
   status: {
     toMove: 'תור',
