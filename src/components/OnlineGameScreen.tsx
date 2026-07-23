@@ -1,4 +1,5 @@
 import { Board } from './Board';
+import { Chat } from './Chat';
 import { StatusBar } from './StatusBar';
 import { useLang } from '../i18n';
 import { useOnlineGame } from '../net/useOnlineGame';
@@ -16,7 +17,8 @@ interface OnlineGameScreenProps {
  */
 export function OnlineGameScreen({ onNewGame }: OnlineGameScreenProps) {
   const { t } = useLang();
-  const { status, role, state, players, selected, myTurn, pending, onSelectSquare, reset } = useOnlineGame();
+  const { status, role, state, players, selected, myTurn, pending, chat, onSelectSquare, sendChat, reset } =
+    useOnlineGame();
 
   const bothPresent = players.red && players.black;
   const seated = role === 'red' || role === 'black';
@@ -66,9 +68,12 @@ export function OnlineGameScreen({ onNewGame }: OnlineGameScreenProps) {
             </div>
           )}
         </div>
-        {/* aiThinking stays false here -- it would mislabel the human opponent as
-            "AI is thinking". The online banner already conveys whose turn it is. */}
-        {state && <StatusBar state={state} opponentLabel={opponentLabel} aiThinking={false} />}
+        <div className="side">
+          {/* aiThinking stays false here -- it would mislabel the human opponent as
+              "AI is thinking". The online banner already conveys whose turn it is. */}
+          {state && <StatusBar state={state} opponentLabel={opponentLabel} aiThinking={false} />}
+          <Chat messages={chat} onSend={sendChat} ownRole={role} disabled={status !== 'open'} />
+        </div>
       </div>
     </>
   );

@@ -2,7 +2,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { getPiece, samePosition } from '../game/board';
 import { getAllLegalMoves, pieceCaptureMoves } from '../game/rules';
 import type { GameState, Move, Position } from '../game/types';
-import { WS_PATH, type ClientMessage, type PlayerPresence, type Role, type ServerMessage } from './protocol';
+import {
+  WS_PATH,
+  type ChatMessage,
+  type ClientMessage,
+  type PlayerPresence,
+  type Role,
+  type ServerMessage,
+} from './protocol';
 
 export type ConnectionStatus = 'connecting' | 'open' | 'closed';
 
@@ -17,7 +24,10 @@ export interface OnlineGame {
   myTurn: boolean;
   /** True briefly after sending a move, until the server's next sync confirms it. */
   pending: boolean;
+  /** Chat history for this session, oldest first. */
+  chat: ChatMessage[];
   onSelectSquare: (position: Position) => void;
+  sendChat: (text: string) => void;
   reset: () => void;
 }
 
@@ -73,6 +83,7 @@ export function useOnlineGame(): OnlineGame {
   const [players, setPlayers] = useState<PlayerPresence>({ red: false, black: false });
   const [selected, setSelected] = useState<Position | null>(null);
   const [pending, setPending] = useState(false);
+  const [chat, setChat] = useState<ChatMessage[]>([]);
   const socketRef = useRef<WebSocket | null>(null);
   const pendingTimer = useRef<ReturnType<typeof setTimeout>>();
 
@@ -105,6 +116,14 @@ export function useOnlineGame(): OnlineGame {
           setState(message.state);
           setPlayers(message.players);
           setPending(false); // the server responded; unlock input
+        } else if (message.type === 'chat') {
+          // Append only unseen ids -- the server replays recent history on every
+          // (re)connect, so dedup keeps a reconnect from duplicating the log.
+          setChat((prev) => {
+            const seen = new Set(prev.map((m) => m.id));
+            const added = message.messages.filter((m) => !seen.has(m.id));
+            return added.length ? [...prev, ...added] : prev;
+          });
         }
       };
       socket.onerror = () => socket.close(); // fall through to onclose's retry
@@ -173,5 +192,13 @@ export function useOnlineGame(): OnlineGame {
 
   const reset = useCallback(() => send({ type: 'reset' }), [send]);
 
-  return { status, role, state, players, selected, myTurn, pending, onSelectSquare, reset };
+  const sendChat = useCallback(
+    (text: string) => {
+      const trimmed = text.trim();
+      if (trimmed) send({ type: 'chat', text: trimmed });
+    },
+    [send],
+  );
+
+  return { status, role, state, players, selected, myTurn, pending, chat, onSelectSquare, sendChat, reset };
 }

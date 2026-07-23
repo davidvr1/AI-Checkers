@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { GameRoom } from './gameRoom';
+import { CHAT_HISTORY_LIMIT, GameRoom, MAX_CHAT_LENGTH } from './gameRoom';
 import type { Move } from '../game/types';
 
 // String client ids stand in for sockets. Red's standard opening move.
@@ -121,5 +121,60 @@ describe('GameRoom: reset', () => {
     room.join('c'); // spectator
     expect(room.reset('c')).toBe(false);
     expect(room.state.board[4][1]).not.toBeNull(); // still mid-game
+  });
+});
+
+describe('GameRoom: chat', () => {
+  it('tags each message with the sender role and assigns increasing ids', () => {
+    const room = new GameRoom<string>();
+    room.join('a'); // red
+    room.join('b'); // black
+    room.join('c'); // spectator
+
+    const m1 = room.chat('a', 'hi');
+    const m2 = room.chat('b', 'hello');
+    const m3 = room.chat('c', 'nice game');
+    expect(m1).toMatchObject({ from: 'red', text: 'hi' });
+    expect(m2).toMatchObject({ from: 'black', text: 'hello' });
+    expect(m3).toMatchObject({ from: 'spectator', text: 'nice game' });
+    expect(m2!.id).toBeGreaterThan(m1!.id);
+    expect(m3!.id).toBeGreaterThan(m2!.id);
+  });
+
+  it('records and replays history oldest-first', () => {
+    const room = new GameRoom<string>();
+    room.join('a');
+    room.chat('a', 'one');
+    room.chat('a', 'two');
+    expect(room.chatHistory().map((m) => m.text)).toEqual(['one', 'two']);
+  });
+
+  it('rejects empty, whitespace-only, and non-string messages without recording them', () => {
+    const room = new GameRoom<string>();
+    room.join('a');
+    expect(room.chat('a', '')).toBeNull();
+    expect(room.chat('a', '   ')).toBeNull();
+    expect(room.chat('a', 42 as unknown)).toBeNull();
+    expect(room.chat('a', null)).toBeNull();
+    expect(room.chat('a', { text: 'x' })).toBeNull();
+    expect(room.chatHistory()).toHaveLength(0);
+  });
+
+  it('trims surrounding whitespace and caps very long messages', () => {
+    const room = new GameRoom<string>();
+    room.join('a');
+    expect(room.chat('a', '  spaced  ')!.text).toBe('spaced');
+    const long = 'x'.repeat(MAX_CHAT_LENGTH + 100);
+    expect(room.chat('a', long)!.text).toHaveLength(MAX_CHAT_LENGTH);
+  });
+
+  it('keeps only the most recent CHAT_HISTORY_LIMIT messages', () => {
+    const room = new GameRoom<string>();
+    room.join('a');
+    for (let i = 0; i < CHAT_HISTORY_LIMIT + 10; i++) room.chat('a', `m${i}`);
+    const history = room.chatHistory();
+    expect(history).toHaveLength(CHAT_HISTORY_LIMIT);
+    expect(history[0].text).toBe('m10'); // the first 10 were dropped
+    expect(history[history.length - 1].text).toBe(`m${CHAT_HISTORY_LIMIT + 9}`);
   });
 });

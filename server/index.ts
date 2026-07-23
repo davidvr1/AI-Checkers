@@ -82,13 +82,22 @@ wss.on('connection', (socket) => {
   const role = room.join(socket);
   send(socket, { type: 'welcome', role });
   broadcastSync(wss);
+  // Replay recent chat so a joining player sees the conversation in progress.
+  send(socket, { type: 'chat', messages: room.chatHistory() });
 
   socket.on('message', (raw) => {
-    // Everything past JSON.parse is wrapped too: `message.move` is arbitrary
+    // Everything past JSON.parse is wrapped too: message payloads are arbitrary
     // client JSON, and no single malformed frame may ever crash the one shared
-    // process. GameRoom.move already shape-checks, but this is belt-and-braces.
+    // process. GameRoom's methods shape-check, but this is belt-and-braces.
     try {
       const message: ClientMessage = JSON.parse(raw.toString());
+      if (message.type === 'chat') {
+        const chatMessage = room.chat(socket, message.text);
+        if (chatMessage) {
+          for (const client of wss.clients) send(client, { type: 'chat', messages: [chatMessage] });
+        }
+        return;
+      }
       const changed =
         message.type === 'move'
           ? room.move(socket, message.move)
