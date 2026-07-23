@@ -32,6 +32,12 @@ export interface Translations {
     difficulty: string;
     startGame: string;
     onlineHint: string;
+    createGame: string;
+    joinGame: string;
+    codePlaceholder: string;
+    creating: string;
+    codeInvalid: string;
+    createFailed: string;
   };
   online: {
     eyebrow: string;
@@ -41,6 +47,9 @@ export interface Translations {
     youArePlaying: (color: string) => string;
     spectating: string;
     spectator: string;
+    gameCode: string;
+    copyLink: string;
+    copied: string;
     yourTurn: string;
     opponentTurn: string;
     rematch: string;
@@ -102,7 +111,14 @@ const en: Translations = {
     yourColor: 'Your color',
     difficulty: 'Difficulty',
     startGame: 'Start Game',
-    onlineHint: 'Two devices on the same WiFi play against each other. First to join is Red, second is Black.',
+    onlineHint:
+      'Create a game to get a private code, then share it (or the link) with your opponent. First to join is Red, second is Black.',
+    createGame: 'Create game',
+    joinGame: 'Join game',
+    codePlaceholder: 'Game code',
+    creating: 'Creating…',
+    codeInvalid: 'Enter the game code your opponent shared.',
+    createFailed: "Couldn't create a game — is the server running?",
   },
   online: {
     eyebrow: 'Online · same WiFi',
@@ -112,6 +128,9 @@ const en: Translations = {
     youArePlaying: (color) => `You are playing ${color}`,
     spectating: 'Both seats are taken — you are watching.',
     spectator: 'Spectator',
+    gameCode: 'Game code',
+    copyLink: 'Copy link',
+    copied: 'Link copied!',
     yourTurn: 'Your turn',
     opponentTurn: "Opponent's turn",
     rematch: 'Rematch',
@@ -179,7 +198,14 @@ const he: Translations = {
     yourColor: 'הצבע שלך',
     difficulty: 'רמת קושי',
     startGame: 'התחל משחק',
-    onlineHint: 'שני מכשירים באותה רשת WiFi משחקים זה נגד זה. הראשון שמצטרף משחק באדום, השני בשחור.',
+    onlineHint:
+      'צור משחק כדי לקבל קוד פרטי, ואז שתף אותו (או את הקישור) עם היריב. הראשון שמצטרף משחק באדום, השני בשחור.',
+    createGame: 'צור משחק',
+    joinGame: 'הצטרף למשחק',
+    codePlaceholder: 'קוד משחק',
+    creating: 'יוצר…',
+    codeInvalid: 'הזן את קוד המשחק ששיתף איתך היריב.',
+    createFailed: 'לא ניתן ליצור משחק — האם השרת פועל?',
   },
   online: {
     eyebrow: 'ברשת · אותה WiFi',
@@ -189,6 +215,9 @@ const he: Translations = {
     youArePlaying: (color) => `אתה משחק ב${color}`,
     spectating: 'שני המקומות תפוסים — אתה צופה במשחק.',
     spectator: 'צופה',
+    gameCode: 'קוד משחק',
+    copyLink: 'העתק קישור',
+    copied: 'הקישור הועתק!',
     yourTurn: 'תורך',
     opponentTurn: 'תור היריב',
     rematch: 'משחק חוזר',

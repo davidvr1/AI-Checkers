@@ -122,7 +122,7 @@ export function App() {
       {config === null ? (
         <GameSetup onStart={setConfig} />
       ) : config.mode === 'online' ? (
-        <OnlineGameScreen onNewGame={onNewGame} />
+        <OnlineGameScreen code={config.code} onNewGame={onNewGame} />
       ) : (
         <GameScreen config={config} onNewGame={onNewGame} />
       )}

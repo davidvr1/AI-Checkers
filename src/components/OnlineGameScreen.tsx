@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Board } from './Board';
 import { Chat } from './Chat';
 import { StatusBar } from './StatusBar';
@@ -7,6 +8,8 @@ import { useOnlineGame } from '../net/useOnlineGame';
 import { useVideo } from '../net/useVideo';
 
 interface OnlineGameScreenProps {
+  /** The private game code this screen is connected to. */
+  code: string;
   onNewGame: () => void;
 }
 
@@ -17,8 +20,9 @@ interface OnlineGameScreenProps {
  * opponent, whose turn, spectating, connection lost) that the shared StatusBar
  * doesn't cover.
  */
-export function OnlineGameScreen({ onNewGame }: OnlineGameScreenProps) {
+export function OnlineGameScreen({ code, onNewGame }: OnlineGameScreenProps) {
   const { t } = useLang();
+  const [copied, setCopied] = useState(false);
   const {
     status,
     role,
@@ -33,7 +37,7 @@ export function OnlineGameScreen({ onNewGame }: OnlineGameScreenProps) {
     reset,
     sendSignal,
     onSignal,
-  } = useOnlineGame();
+  } = useOnlineGame(code);
 
   const bothPresent = players.red && players.black;
   const video = useVideo({ role, opponentPresent: bothPresent, status, sendSignal, onSignal });
@@ -55,6 +59,29 @@ export function OnlineGameScreen({ onNewGame }: OnlineGameScreenProps) {
         <span className="eyebrow">{t.online.eyebrow}</span>
         <h1>{t.appTitle}</h1>
         {banner && <p className={`online-banner${status === 'closed' ? ' error' : ''}`}>{banner}</p>}
+
+        {/* The private code + a one-click shareable link for the opponent. */}
+        <div className="game-code">
+          <span className="game-code-label">{t.online.gameCode}</span>
+          <span className="game-code-value">{code}</span>
+          <button
+            type="button"
+            className="game-code-copy"
+            onClick={async () => {
+              const link = `${location.origin}${location.pathname}?g=${encodeURIComponent(code)}`;
+              try {
+                await navigator.clipboard.writeText(link);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+              } catch {
+                /* clipboard blocked -- the code is shown above to share manually */
+              }
+            }}
+          >
+            {copied ? t.online.copied : t.online.copyLink}
+          </button>
+        </div>
+
         <div className="online-actions">
           {seated && state && state.status.type !== 'in-progress' && (
             <button type="button" className="setup-start rematch" onClick={reset}>
