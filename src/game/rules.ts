@@ -65,15 +65,18 @@ export function pieceSimpleMoves(board: Board, pos: Position): Move[] {
 /**
  * Single-jump capture moves for the piece at `pos`, belonging to `player`.
  *
- * Men may capture in any diagonal direction (including backward) by jumping one
- * adjacent enemy piece -- except a man may only capture an enemy KING by jumping
- * forward; capturing an enemy man is unrestricted (house rule: "a man can indeed
- * capture a king, but only advancing").
+ * Men capture FORWARD ONLY -- the two forward diagonals, jumping one adjacent
+ * enemy piece into the empty square beyond. This is a deliberate house rule
+ * (American/English draughts style), chosen by the user on 2026-07-23 in
+ * preference to the he.wikibooks Israeli-draughts page, which permits backward
+ * captures; see the Spec Change Log. (Men's simple moves were already forward
+ * only, so a man never moves backward at all now, capturing or not.)
  *
  * Kings are "flying kings": along a clear diagonal, a king may jump the first
  * enemy piece it meets and land on *any* empty square beyond it (up to the next
  * occupied square or the edge) -- so one capturing king position can have
- * several landing options for the same captured piece.
+ * several landing options for the same captured piece. Kings are unaffected by
+ * the forward-only rule; they capture in all four diagonal directions.
  */
 export function pieceCaptureMoves(board: Board, pos: Position, player: PieceColor): Move[] {
   const piece = getPiece(board, pos);
@@ -93,14 +96,14 @@ export function pieceCaptureMoves(board: Board, pos: Position, player: PieceColo
     return moves;
   }
 
+  const forward = forwardRow(player);
   const moves: Move[] = [];
-  for (const dir of ALL_DIRECTIONS) {
+  for (const dir of [{ row: forward, col: -1 }, { row: forward, col: 1 }]) {
     const mid = step(pos, dir);
     const to = step(pos, dir, 2);
     if (!isOnBoard(to)) continue;
     const midPiece = getPiece(board, mid);
     if (!midPiece || midPiece.color === player || getPiece(board, to) !== null) continue;
-    if (midPiece.kind === 'king' && dir.row !== forwardRow(player)) continue;
     moves.push({ from: pos, to, captured: mid });
   }
   return moves;
