@@ -427,3 +427,37 @@ hr.rule {
 .setup-start:hover {
   filter: brightness(1.08);
 }
+
+/* ---- Language toggle ---- */
+/* Fixed to the trailing top corner via logical inset, so it sits top-right in
+   English (LTR) and top-left in Hebrew (RTL) automatically. */
+.lang-toggle {
+  position: fixed;
+  inset-block-start: clamp(12px, 2.5vw, 20px);
+  inset-inline-end: clamp(12px, 2.5vw, 20px);
+  z-index: 10;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--panel-border);
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+  transition: border-color 120ms ease, color 120ms ease;
+}
+
+.lang-toggle:hover {
+  border-color: var(--brass);
+  color: var(--brass);
+}
+
+.lang-toggle .lang-globe {
+  font-size: 15px;
+  line-height: 1;
+}

@@ -1,6 +1,6 @@
-import { capitalize } from '../format';
 import { DRAW_TURN_LIMIT } from '../game/gameReducer';
 import type { GameState } from '../game/types';
+import { useLang } from '../i18n';
 
 interface StatusBarProps {
   state: GameState;
@@ -11,23 +11,24 @@ interface StatusBarProps {
 }
 
 export function StatusBar({ state, opponentLabel, aiThinking }: StatusBarProps) {
+  const { t } = useLang();
   const { status, currentPlayer, capturedCount, turnsSinceCapture } = state;
 
   let swatchClass: 'red' | 'black' | 'neutral' = currentPlayer;
-  let turnLabel = 'To move';
-  let turnValue = capitalize(currentPlayer);
+  let turnLabel = t.status.toMove;
+  let turnValue = t.colors[currentPlayer];
 
   if (status.type === 'won') {
     swatchClass = status.winner;
-    turnLabel = 'Game over';
-    turnValue = `${capitalize(status.winner)} wins`;
+    turnLabel = t.status.gameOver;
+    turnValue = t.status.wins(t.colors[status.winner]);
   } else if (status.type === 'draw') {
     swatchClass = 'neutral';
-    turnLabel = 'Game over';
-    turnValue = 'Draw';
+    turnLabel = t.status.gameOver;
+    turnValue = t.status.draw;
   } else if (aiThinking) {
-    turnLabel = 'AI is thinking';
-    turnValue = `${capitalize(currentPlayer)}…`;
+    turnLabel = t.status.aiThinking;
+    turnValue = `${t.colors[currentPlayer]}…`;
   }
 
   return (
@@ -48,20 +49,20 @@ export function StatusBar({ state, opponentLabel, aiThinking }: StatusBarProps) 
         <div className="tally-row">
           <span className="label">
             <span className="dot-key red" />
-            Red captured
+            {t.status.redCaptured}
           </span>
           <span className="n">{capturedCount.red}</span>
         </div>
         <div className="tally-row">
           <span className="label">
             <span className="dot-key black" />
-            Black captured
+            {t.status.blackCaptured}
           </span>
           <span className="n">{capturedCount.black}</span>
         </div>
         <div className="tally-row">
-          <span className="label">Turns since capture</span>
-          <span className="n">
+          <span className="label">{t.status.turnsSinceCapture}</span>
+          <span className="n" dir="ltr">
             {turnsSinceCapture} / {DRAW_TURN_LIMIT}
           </span>
         </div>
@@ -71,13 +72,13 @@ export function StatusBar({ state, opponentLabel, aiThinking }: StatusBarProps) 
 
       <div className="legend">
         <div className="legend-item">
-          <span className="legend-swatch ring" /> Selected piece
+          <span className="legend-swatch ring" /> {t.status.selectedPiece}
         </div>
         <div className="legend-item">
           <span className="legend-swatch moveto">
             <span className="inner" />
           </span>{' '}
-          Legal destination
+          {t.status.legalDestination}
         </div>
       </div>
     </div>
