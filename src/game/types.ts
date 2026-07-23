@@ -83,7 +83,8 @@ export type Difficulty = 'easy' | 'medium' | 'hard';
 export type GameConfig =
   | { mode: 'human' }
   | { mode: 'ai'; humanColor: PieceColor; difficulty: Difficulty }
-  | { mode: 'online' };
+  /** `code` names the private game to join -- only people with it share the board. */
+  | { mode: 'online'; code: string };
 
 export type Action =
   | { type: 'SELECT_SQUARE'; position: Position }

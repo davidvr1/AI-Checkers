@@ -1,3 +1,4 @@
+import { createServer as createHttpServer } from 'node:http';
 import { createServer as createHttpsServer } from 'node:https';
 import { networkInterfaces } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -73,10 +74,65 @@ async function loadTls(): Promise<{ cert: string | Buffer; key: string | Buffer;
   return { cert: pems.cert, key: pems.private, selfSigned: true };
 }
 
-// One shared match for the whole server (a home-WiFi, two-player scenario). All
-// authoritative game/seat logic lives in GameRoom -- this file is just the
-// WebSocket adapter around it. Browsers only ever render what we broadcast.
-const room = new GameRoom<WebSocket>();
+// --- Game sessions, keyed by a short share code -------------------------------
+// Each code is an independent match (its own GameRoom + connected clients), so a
+// public URL can be shared safely: only people with your code join your game.
+// Codes avoid look-alike characters (no O/0, I/1/L).
+const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+const CODE_LENGTH = 5;
+/** How long an empty session is kept before it's swept (allows brief drop/rejoin). */
+const EMPTY_SESSION_TTL_MS = 10 * 60_000;
+
+interface Session {
+  room: GameRoom<WebSocket>;
+  clients: Set<WebSocket>;
+  /** When the session became client-less, for the sweeper; null while occupied. */
+  emptySince: number | null;
+}
+
+const sessions = new Map<string, Session>();
+
+function randomCode(): string {
+  let code = '';
+  for (let i = 0; i < CODE_LENGTH; i++) {
+    code += CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)];
+  }
+  return code;
+}
+
+/** Uppercases and validates a client-supplied code; null if it isn't well-formed. */
+function normalizeCode(raw: string | null | undefined): string | null {
+  if (typeof raw !== 'string') return null;
+  const code = raw.trim().toUpperCase();
+  return /^[A-Z0-9]{4,8}$/.test(code) ? code : null;
+}
+
+function getOrCreateSession(code: string): Session {
+  let session = sessions.get(code);
+  if (!session) {
+    session = { room: new GameRoom<WebSocket>(), clients: new Set(), emptySince: Date.now() };
+    sessions.set(code, session);
+  }
+  return session;
+}
+
+/** Reserves and returns a code that isn't already in use. */
+function reserveNewCode(): string {
+  let code = randomCode();
+  while (sessions.has(code)) code = randomCode();
+  getOrCreateSession(code);
+  return code;
+}
+
+// Drop sessions that have sat empty past the TTL, so codes and memory don't leak.
+setInterval(() => {
+  const now = Date.now();
+  for (const [code, session] of sessions) {
+    if (session.clients.size === 0 && session.emptySince !== null && now - session.emptySince > EMPTY_SESSION_TTL_MS) {
+      sessions.delete(code);
+    }
+  }
+}, 60_000).unref?.();
 
 function send(socket: WebSocket, message: ServerMessage): void {
   if (socket.readyState === socket.OPEN) {
@@ -84,13 +140,25 @@ function send(socket: WebSocket, message: ServerMessage): void {
   }
 }
 
-function broadcastSync(wss: WebSocketServer): void {
-  const message: ServerMessage = { type: 'sync', state: room.state, players: room.presence() };
-  for (const client of wss.clients) send(client, message);
+/** Broadcasts to one session's clients only -- never across games. */
+function broadcastSync(session: Session): void {
+  const message: ServerMessage = {
+    type: 'sync',
+    state: session.room.state,
+    players: session.room.presence(),
+  };
+  for (const client of session.clients) send(client, message);
 }
 
 // --- HTTP (serves the built app) + WebSocket (game sync) on one port ----------
 const app = express();
+
+// Hands the client a fresh, unused game code (and reserves it). Registered before
+// the static/SPA handlers so it isn't swallowed by the index.html fallback.
+app.get('/api/new-code', (_req, res) => {
+  res.json({ code: reserveNewCode() });
+});
+
 if (existsSync(distDir)) {
   app.use(express.static(distDir));
   // SPA fallback: return index.html only for extension-less GET paths (client
@@ -113,11 +181,20 @@ if (existsSync(distDir)) {
   );
 }
 
-const tls = await loadTls();
-const httpsServer = createHttpsServer({ cert: tls.cert, key: tls.key }, app);
+/**
+ * Behind a TLS-terminating proxy (a Cloudflare/ngrok tunnel, or a cloud host) the
+ * public HTTPS is provided for us, so the origin must speak plain HTTP. Set
+ * HTTP_ONLY=1 for that. Direct LAN use keeps HTTPS, which browsers require for
+ * camera access on a non-localhost address.
+ */
+const httpOnly = process.env.HTTP_ONLY === '1' || process.env.HTTP_ONLY === 'true';
+const tls = httpOnly ? null : await loadTls();
+const httpServer = httpOnly
+  ? createHttpServer(app)
+  : createHttpsServer({ cert: tls!.cert, key: tls!.key }, app);
 // maxPayload caps a single frame at 64 KB. Signaling frames (SDP/ICE) are the
 // largest legitimate payload but stay well under this; a move/chat is tiny.
-const wss = new WebSocketServer({ server: httpsServer, path: WS_PATH, maxPayload: 64 * 1024 });
+const wss = new WebSocketServer({ server: httpServer, path: WS_PATH, maxPayload: 64 * 1024 });
 
 // Liveness sockets that die without a clean TCP close (a phone leaving WiFi, iOS
 // suspending the tab) would otherwise hold their seat forever. We ping every
@@ -137,13 +214,26 @@ const heartbeat = setInterval(() => {
 }, HEARTBEAT_MS);
 wss.on('close', () => clearInterval(heartbeat));
 
-wss.on('connection', (socket) => {
+wss.on('connection', (socket, request) => {
+  // Route this socket to the game named by ?g=CODE. Without a valid code there's
+  // no game to join, so close rather than dumping the client into someone else's.
+  const requestUrl = new URL(request.url ?? '/', 'http://localhost');
+  const code = normalizeCode(requestUrl.searchParams.get('g'));
+  if (!code) {
+    socket.close(1008, 'missing or invalid game code');
+    return;
+  }
+  const session = getOrCreateSession(code);
+  const room = session.room;
+  session.clients.add(socket);
+  session.emptySince = null;
+
   alive.set(socket, true);
   socket.on('pong', () => alive.set(socket, true));
 
   const role = room.join(socket);
   send(socket, { type: 'welcome', role });
-  broadcastSync(wss);
+  broadcastSync(session);
   // Replay recent chat so a joining player sees the conversation in progress.
   send(socket, { type: 'chat', messages: room.chatHistory() });
 
@@ -156,7 +246,7 @@ wss.on('connection', (socket) => {
       if (message.type === 'chat') {
         const chatMessage = room.chat(socket, message.text);
         if (chatMessage) {
-          for (const client of wss.clients) send(client, { type: 'chat', messages: [chatMessage] });
+          for (const client of session.clients) send(client, { type: 'chat', messages: [chatMessage] });
         }
         return;
       }
@@ -172,7 +262,7 @@ wss.on('connection', (socket) => {
           : message.type === 'reset'
             ? room.reset(socket)
             : false;
-      if (changed) broadcastSync(wss);
+      if (changed) broadcastSync(session);
     } catch {
       // ignore malformed / unparseable frames
     }
@@ -180,7 +270,10 @@ wss.on('connection', (socket) => {
 
   socket.on('close', () => {
     room.leave(socket);
-    broadcastSync(wss);
+    session.clients.delete(socket);
+    // Start the sweep clock once nobody is left in this game.
+    if (session.clients.size === 0) session.emptySince = Date.now();
+    broadcastSync(session);
   });
 
   // A per-socket error (reset by peer, etc.) must not bubble to an uncaught
@@ -188,9 +281,13 @@ wss.on('connection', (socket) => {
   socket.on('error', () => socket.close());
 });
 
-httpsServer.listen(PORT, '0.0.0.0', () => {
-  console.log(`\n  Checkers online is running (HTTPS) on port ${PORT}.\n`);
-  if (process.env.RUNNING_IN_DOCKER) {
+httpServer.listen(PORT, '0.0.0.0', () => {
+  const scheme = httpOnly ? 'http' : 'https';
+  console.log(`\n  Checkers online is running (${scheme.toUpperCase()}) on port ${PORT}.\n`);
+  if (httpOnly) {
+    console.log(`  Origin:                http://localhost:${PORT}`);
+    console.log('  HTTP_ONLY=1 -- expecting a tunnel/proxy in front to provide public HTTPS.');
+  } else if (process.env.RUNNING_IN_DOCKER) {
     // Inside a container, os.networkInterfaces() reports the container's private
     // IPs, which no other device can reach. Point users at the host instead.
     console.log(`  On this computer:      https://localhost:${PORT}`);
@@ -206,8 +303,8 @@ httpsServer.listen(PORT, '0.0.0.0', () => {
       console.log('  (No LAN IPv4 address found -- are you connected to WiFi?)');
     }
   }
-  console.log('\n  First device to open it plays Red, second plays Black. Others watch.');
-  if (tls.selfSigned) {
+  console.log('\n  Create a game to get a code, then share the code (or link) with your opponent.');
+  if (tls?.selfSigned) {
     console.log('\n  NOTE: using a self-signed certificate, so each device shows a one-time');
     console.log('  "your connection is not private" warning -- click Advanced -> Proceed.');
     console.log('  (HTTPS is required for the camera feature to work.)');

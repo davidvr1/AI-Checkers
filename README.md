@@ -22,8 +22,26 @@ docker compose up -d --build      # or: docker build -t ai-checkers . && docker 
 
 Then on any device on the same network, open **`https://<HOST-MACHINE-LAN-IP>:4173`**
 (find the host's IP with `ipconfig` on Windows or `ip addr` on Linux/macOS).
-The first device to open it plays **Red**, the second plays **Black**, and anyone
-else can watch. To use a different port: `docker run -d -e PORT=3000 -p 3000:3000 ai-checkers`.
+Choose **Online → Create game** to get a private **game code**, then share the code
+(or the copied link) with your opponent, who picks **Online**, enters it, and joins.
+The creator plays **Red**, the joiner **Black**, and anyone else with the code can
+watch. Each code is a separate game, so several can run at once.
+To use a different port: `docker run -d -e PORT=3000 -p 3000:3000 ai-checkers`.
+
+### Play over the internet (not just your LAN)
+
+Put a tunnel in front of the server so it gets a public HTTPS URL with a real
+certificate (no warnings, and iOS cameras work). Run the server in plain-HTTP
+mode and let the tunnel terminate TLS:
+
+```bash
+HTTP_ONLY=1 npm run serve                      # origin on http://localhost:4173
+cloudflared tunnel --url http://localhost:4173 # prints a public https://... URL
+```
+
+Share that URL plus your game code. Only people with the code join your game.
+Note: the peer-to-peer **video** may not connect between very different networks
+without a TURN relay (the game and chat always work).
 
 > The server runs over **HTTPS** (required so browsers allow the camera). With the
 > built-in self-signed certificate each device shows a one-time

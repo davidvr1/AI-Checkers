@@ -82,7 +82,7 @@ function resolveClick(
  * on, never applied locally. Reconnects automatically (with backoff) so a brief
  * mobile WiFi drop resumes the game rather than ending it.
  */
-export function useOnlineGame(): OnlineGame {
+export function useOnlineGame(code: string): OnlineGame {
   const [status, setStatus] = useState<ConnectionStatus>('connecting');
   const [role, setRole] = useState<Role | null>(null);
   const [state, setState] = useState<GameState | null>(null);
@@ -95,7 +95,9 @@ export function useOnlineGame(): OnlineGame {
   const signalHandlerRef = useRef<((from: Role, data: unknown) => void) | null>(null);
 
   useEffect(() => {
-    const url = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}${WS_PATH}`;
+    // The code selects which private game this socket joins; the server rejects a
+    // connection without a valid one rather than dropping us into another game.
+    const url = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}${WS_PATH}?g=${encodeURIComponent(code)}`;
     let unmounted = false;
     let attempts = 0;
     let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
@@ -160,7 +162,7 @@ export function useOnlineGame(): OnlineGame {
       }
       socketRef.current = null;
     };
-  }, []);
+  }, [code]);
 
   const send = useCallback((message: ClientMessage) => {
     const socket = socketRef.current;

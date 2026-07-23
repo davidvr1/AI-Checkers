@@ -9,16 +9,52 @@ interface GameSetupProps {
 const DIFFICULTIES: Difficulty[] = ['easy', 'medium', 'hard'];
 const COLORS: PieceColor[] = ['red', 'black'];
 
+/** A shared link may carry the game code as ?g=CODE -- prefill the join field from it. */
+function codeFromUrl(): string {
+  if (typeof location === 'undefined') return '';
+  const raw = new URLSearchParams(location.search).get('g') ?? '';
+  return raw.trim().toUpperCase();
+}
+
 export function GameSetup({ onStart }: GameSetupProps) {
   const { t } = useLang();
-  const [mode, setMode] = useState<GameMode>('human');
+  const initialCode = codeFromUrl();
+  // A link with ?g=CODE means "join this game" -- open straight on the online tab.
+  const [mode, setMode] = useState<GameMode>(initialCode ? 'online' : 'human');
   const [humanColor, setHumanColor] = useState<PieceColor>('red');
   const [difficulty, setDifficulty] = useState<Difficulty>('medium');
+  const [code, setCode] = useState(initialCode);
+  const [creating, setCreating] = useState(false);
+  const [codeError, setCodeError] = useState<string | null>(null);
 
   const handleStart = () => {
     if (mode === 'human') onStart({ mode: 'human' });
-    else if (mode === 'online') onStart({ mode: 'online' });
-    else onStart({ mode: 'ai', humanColor, difficulty });
+    else if (mode === 'ai') onStart({ mode: 'ai', humanColor, difficulty });
+    else {
+      // Online: join the typed/shared code.
+      const trimmed = code.trim().toUpperCase();
+      if (!/^[A-Z0-9]{4,8}$/.test(trimmed)) {
+        setCodeError(t.setup.codeInvalid);
+        return;
+      }
+      onStart({ mode: 'online', code: trimmed });
+    }
+  };
+
+  /** Asks the server for a fresh unused code, then opens that game. */
+  const handleCreate = async () => {
+    setCodeError(null);
+    setCreating(true);
+    try {
+      const response = await fetch('/api/new-code');
+      if (!response.ok) throw new Error(String(response.status));
+      const { code: fresh } = (await response.json()) as { code: string };
+      onStart({ mode: 'online', code: fresh });
+    } catch {
+      setCodeError(t.setup.createFailed);
+    } finally {
+      setCreating(false);
+    }
   };
 
   return (
@@ -60,7 +96,33 @@ export function GameSetup({ onStart }: GameSetupProps) {
           </div>
         </div>
 
-        {mode === 'online' && <p className="setup-hint">{t.setup.onlineHint}</p>}
+        {mode === 'online' && (
+          <>
+            <p className="setup-hint">{t.setup.onlineHint}</p>
+            <button type="button" className="setup-start" onClick={handleCreate} disabled={creating}>
+              {creating ? t.setup.creating : t.setup.createGame}
+            </button>
+            <div className="setup-group">
+              <span className="setup-label" id="code-label">{t.setup.joinGame}</span>
+              <div className="setup-join">
+                <input
+                  type="text"
+                  value={code}
+                  onChange={(event) => {
+                    setCode(event.target.value.toUpperCase());
+                    setCodeError(null);
+                  }}
+                  placeholder={t.setup.codePlaceholder}
+                  aria-labelledby="code-label"
+                  maxLength={8}
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+              </div>
+              {codeError && <p className="setup-error">{codeError}</p>}
+            </div>
+          </>
+        )}
 
         {mode === 'ai' && (
           <>
@@ -100,8 +162,10 @@ export function GameSetup({ onStart }: GameSetupProps) {
           </>
         )}
 
+        {/* In online mode this button joins the entered code; "Create game" above
+            starts a brand-new one. */}
         <button type="button" className="setup-start" onClick={handleStart}>
-          {t.setup.startGame}
+          {mode === 'online' ? t.setup.joinGame : t.setup.startGame}
         </button>
       </div>
     </div>
