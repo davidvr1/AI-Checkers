@@ -678,7 +678,13 @@ hr.rule {
   line-height: 1.4;
 }
 
+.video-controls {
+  display: flex;
+  gap: var(--space-sm);
+}
+
 .video-toggle {
+  flex: 1;
   padding: 8px 12px;
   border-radius: var(--radius-md);
   border: 1px solid var(--panel-border);
