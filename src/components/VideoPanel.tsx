@@ -28,7 +28,15 @@ export function VideoPanel({ video }: { video: VideoState }) {
       <div className="video-title">{t.video.title}</div>
       <div className="video-stage" dir="ltr">
         <video ref={remoteRef} className="video-remote" autoPlay playsInline />
-        {!video.remoteStream && <div className="video-hint">{t.video.waitingOpponent}</div>}
+        {!video.remoteStream && (
+          <div className={`video-hint${video.connection === 'failed' ? ' error' : ''}`}>
+            {video.connection === 'failed'
+              ? t.video.connectFailed
+              : video.connection === 'connecting'
+                ? t.video.connecting
+                : t.video.waitingOpponent}
+          </div>
+        )}
         {video.localStream && (
           <video ref={localRef} className="video-local" autoPlay playsInline muted />
         )}
