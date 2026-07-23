@@ -677,6 +677,53 @@ hr.rule {
   transform: scaleX(-1); /* mirror the self-view, like a real mirror */
 }
 
+.video-enlarge {
+  position: absolute;
+  inset-block-start: 6px;
+  inset-inline-end: 6px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.85;
+}
+
+.video-enlarge:hover {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.7);
+}
+
+/* Full-screen "enlarge" view of the video stage. */
+.video-stage:fullscreen {
+  width: 100vw;
+  height: 100vh;
+  border-radius: 0;
+}
+.video-stage:fullscreen .video-remote {
+  object-fit: contain; /* show the whole frame, don't crop, when large */
+}
+.video-stage:fullscreen .video-local {
+  width: min(22vw, 260px);
+  inset-block-end: 16px;
+  inset-inline-end: 16px;
+}
+.video-stage:fullscreen .video-enlarge {
+  width: 40px;
+  height: 40px;
+  font-size: 20px;
+}
+.video-stage:fullscreen .video-hint {
+  font-size: 18px;
+}
+
 .video-error {
   color: var(--garnet);
   font-size: 12.5px;
