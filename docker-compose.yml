@@ -1,0 +1,12 @@
+# Run the checkers server in one command:  docker compose up -d --build
+# Then open http://<this-machine's-LAN-IP>:4173 on any device on the same network.
+services:
+  checkers:
+    build: .
+    image: ai-checkers
+    container_name: ai-checkers
+    ports:
+      - "4173:4173" # host:container -- change the host side to serve on another port
+    environment:
+      - PORT=4173
+    restart: unless-stopped
