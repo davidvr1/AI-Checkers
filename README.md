@@ -20,20 +20,30 @@ insufficient material.
 docker compose up -d --build      # or: docker build -t ai-checkers . && docker run -d -p 4173:4173 ai-checkers
 ```
 
-Then on any device on the same network, open **`http://<HOST-MACHINE-LAN-IP>:4173`**
+Then on any device on the same network, open **`https://<HOST-MACHINE-LAN-IP>:4173`**
 (find the host's IP with `ipconfig` on Windows or `ip addr` on Linux/macOS).
 The first device to open it plays **Red**, the second plays **Black**, and anyone
 else can watch. To use a different port: `docker run -d -e PORT=3000 -p 3000:3000 ai-checkers`.
+
+> The server runs over **HTTPS** (required so browsers allow the camera). With the
+> built-in self-signed certificate each device shows a one-time
+> "your connection is not private" warning — click **Advanced → Proceed**. To avoid
+> the warning — and note **iOS Safari may refuse the camera on a click-through
+> self-signed cert** — supply a trusted cert via `TLS_CERT_FILE` / `TLS_KEY_FILE`
+> (e.g. from [mkcert](https://github.com/FiloSottile/mkcert), whose local CA you
+> install on each device). The certificate is regenerated on each restart, so the
+> click-through must be repeated after restarting the server.
 
 **Without Docker** (Node 20+):
 
 ```bash
 npm install
-npm run serve      # builds the app, then starts the server; it prints the LAN URLs to open
+npm run serve      # builds the app, then starts the HTTPS server; it prints the LAN URLs to open
 ```
 
 > On Windows, allow Node through the firewall (Private networks) the first time,
-> or other devices can't connect.
+> or other devices can't connect. The server is HTTPS with a self-signed cert, so
+> each device shows a one-time "not private" warning to click through.
 
 ### Local development
 

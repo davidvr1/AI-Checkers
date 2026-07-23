@@ -64,8 +64,19 @@ export class GameRoom<Client> {
   }
 
   /** A connected client is a seated color, or a spectator otherwise. */
-  private roleFor(client: Client): Role {
+  roleFor(client: Client): Role {
     return this.seatColor(client) ?? 'spectator';
+  }
+
+  /**
+   * The other seated player, for relaying WebRTC signaling. Returns null if
+   * `client` isn't seated or the opposite seat is empty -- video is strictly
+   * between the two players, so spectators never get a signaling peer.
+   */
+  opponentOf(client: Client): Client | null {
+    const color = this.seatColor(client);
+    if (color === null) return null;
+    return color === 'red' ? this.seats.black : this.seats.red;
   }
 
   /** The recent chat history, oldest first -- replayed to a client on connect. */

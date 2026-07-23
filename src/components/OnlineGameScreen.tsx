@@ -1,8 +1,10 @@
 import { Board } from './Board';
 import { Chat } from './Chat';
 import { StatusBar } from './StatusBar';
+import { VideoPanel } from './VideoPanel';
 import { useLang } from '../i18n';
 import { useOnlineGame } from '../net/useOnlineGame';
+import { useVideo } from '../net/useVideo';
 
 interface OnlineGameScreenProps {
   onNewGame: () => void;
@@ -17,10 +19,24 @@ interface OnlineGameScreenProps {
  */
 export function OnlineGameScreen({ onNewGame }: OnlineGameScreenProps) {
   const { t } = useLang();
-  const { status, role, state, players, selected, myTurn, pending, chat, onSelectSquare, sendChat, reset } =
-    useOnlineGame();
+  const {
+    status,
+    role,
+    state,
+    players,
+    selected,
+    myTurn,
+    pending,
+    chat,
+    onSelectSquare,
+    sendChat,
+    reset,
+    sendSignal,
+    onSignal,
+  } = useOnlineGame();
 
   const bothPresent = players.red && players.black;
+  const video = useVideo({ role, opponentPresent: bothPresent, status, sendSignal, onSignal });
   const seated = role === 'red' || role === 'black';
 
   let banner: string;
@@ -72,6 +88,7 @@ export function OnlineGameScreen({ onNewGame }: OnlineGameScreenProps) {
           {/* aiThinking stays false here -- it would mislabel the human opponent as
               "AI is thinking". The online banner already conveys whose turn it is. */}
           {state && <StatusBar state={state} opponentLabel={opponentLabel} aiThinking={false} />}
+          <VideoPanel video={video} />
           <Chat messages={chat} onSend={sendChat} ownRole={role} disabled={status !== 'open'} />
         </div>
       </div>
