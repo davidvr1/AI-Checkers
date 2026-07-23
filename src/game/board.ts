@@ -1,4 +1,4 @@
-import type { Board, Piece, PieceColor, Position, Square } from './types';
+import type { Board, MoveLogEntry, Piece, PieceColor, Position, Square } from './types';
 
 export const BOARD_SIZE = 8;
 
@@ -65,6 +65,24 @@ export function positionKey(board: Board, player: PieceColor): string {
     }
   }
   return key;
+}
+
+/**
+ * The origin and final-landing squares of the most recent turn, for highlighting
+ * "what just happened" -- especially useful in online play, where you see the
+ * board change without watching the opponent move. Returns the `from` of the
+ * turn's first leg and the `to` of its last leg, so a multi-jump reads as one
+ * origin -> final-square hop rather than only its last leg. Null before any move.
+ */
+export function lastTurnSquares(history: MoveLogEntry[]): { from: Position; to: Position } | null {
+  if (history.length === 0) return null;
+  const last = history[history.length - 1];
+  // Walk back over the trailing run of same-player entries (the legs of one
+  // multi-jump turn); turns otherwise alternate players, so this stops at the
+  // turn boundary.
+  let first = history.length - 1;
+  while (first > 0 && history[first - 1].player === last.player) first--;
+  return { from: history[first].from, to: last.to };
 }
 
 export function enumeratePieces(board: Board, color: PieceColor): Position[] {

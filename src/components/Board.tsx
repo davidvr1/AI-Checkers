@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { isDarkSquare, samePosition } from '../game/board';
+import { isDarkSquare, lastTurnSquares, samePosition } from '../game/board';
 import { currentLegalMoves } from '../game/gameReducer';
 import type { GameState, Position } from '../game/types';
 import { Square } from './Square';
@@ -23,6 +23,10 @@ export function Board({ state, onSelectSquare, disabled }: BoardProps) {
       .map((move) => move.to);
   }, [state, activeFrom]);
 
+  // Highlight the last move's from/to squares -- shown regardless of `disabled`,
+  // since its whole point is to reveal what the opponent (or AI) just played.
+  const lastMove = useMemo(() => lastTurnSquares(state.history), [state.history]);
+
   const rows = Array.from({ length: 8 }, (_, row) => row);
   const cols = Array.from({ length: 8 }, (_, col) => col);
 
@@ -39,6 +43,10 @@ export function Board({ state, onSelectSquare, disabled }: BoardProps) {
               piece={piece}
               isSelected={activeFrom !== null && samePosition(activeFrom, position)}
               isLegalDestination={destinations.some((dest) => samePosition(dest, position))}
+              isLastMove={
+                lastMove !== null &&
+                (samePosition(lastMove.from, position) || samePosition(lastMove.to, position))
+              }
               disabled={disabled}
               onClick={() => onSelectSquare(position)}
             />

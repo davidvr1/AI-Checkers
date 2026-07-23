@@ -6,12 +6,13 @@ interface SquareProps {
   piece: PieceModel | null;
   isSelected: boolean;
   isLegalDestination: boolean;
+  isLastMove?: boolean;
   disabled?: boolean;
   onClick: () => void;
 }
 
-export function Square({ isDark, piece, isSelected, isLegalDestination, disabled, onClick }: SquareProps) {
-  const classes = ['sq', isDark ? 'dark' : 'light', isSelected ? 'selected' : '']
+export function Square({ isDark, piece, isSelected, isLegalDestination, isLastMove, disabled, onClick }: SquareProps) {
+  const classes = ['sq', isDark ? 'dark' : 'light', isSelected ? 'selected' : '', isLastMove ? 'last-move' : '']
     .filter(Boolean)
     .join(' ');
 
