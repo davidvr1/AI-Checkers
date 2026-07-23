@@ -40,9 +40,16 @@ export interface Translations {
     waitingForOpponent: string;
     youArePlaying: (color: string) => string;
     spectating: string;
+    spectator: string;
     yourTurn: string;
     opponentTurn: string;
     rematch: string;
+  };
+  chat: {
+    title: string;
+    placeholder: string;
+    send: string;
+    empty: string;
   };
   status: {
     toMove: string;
@@ -91,9 +98,16 @@ const en: Translations = {
     waitingForOpponent: 'Waiting for an opponent to join…',
     youArePlaying: (color) => `You are playing ${color}`,
     spectating: 'Both seats are taken — you are watching.',
+    spectator: 'Spectator',
     yourTurn: 'Your turn',
     opponentTurn: "Opponent's turn",
     rematch: 'Rematch',
+  },
+  chat: {
+    title: 'Chat',
+    placeholder: 'Type a message…',
+    send: 'Send',
+    empty: 'No messages yet — say hello!',
   },
   status: {
     toMove: 'To move',
@@ -142,9 +156,16 @@ const he: Translations = {
     waitingForOpponent: 'ממתין ליריב שיצטרף…',
     youArePlaying: (color) => `אתה משחק ב${color}`,
     spectating: 'שני המקומות תפוסים — אתה צופה במשחק.',
+    spectator: 'צופה',
     yourTurn: 'תורך',
     opponentTurn: 'תור היריב',
     rematch: 'משחק חוזר',
+  },
+  chat: {
+    title: 'צ׳אט',
+    placeholder: 'כתוב הודעה…',
+    send: 'שלח',
+    empty: 'אין הודעות עדיין — תגיד שלום!',
   },
   status: {
     toMove: 'תור',

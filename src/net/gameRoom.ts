@@ -1,7 +1,12 @@
 import { BOARD_SIZE } from '../game/board';
 import { createInitialState, gameReducer } from '../game/gameReducer';
 import type { GameState, Move, PieceColor, Position } from '../game/types';
-import type { PlayerPresence, Role } from './protocol';
+import type { ChatMessage, PlayerPresence, Role } from './protocol';
+
+/** Longest chat message accepted; longer text is truncated. */
+export const MAX_CHAT_LENGTH = 500;
+/** How many recent chat lines the room keeps (and replays to a joining client). */
+export const CHAT_HISTORY_LIMIT = 50;
 
 function isPosition(p: unknown): p is Position {
   if (!p || typeof p !== 'object') return false;
@@ -41,6 +46,8 @@ export function isValidMove(move: unknown): move is Move {
 export class GameRoom<Client> {
   private game: GameState = createInitialState();
   private seats: Record<PieceColor, Client | null> = { red: null, black: null };
+  private chatLog: ChatMessage[] = [];
+  private nextChatId = 1;
 
   get state(): GameState {
     return this.game;
@@ -54,6 +61,36 @@ export class GameRoom<Client> {
     if (this.seats.red === client) return 'red';
     if (this.seats.black === client) return 'black';
     return null;
+  }
+
+  /** A connected client is a seated color, or a spectator otherwise. */
+  private roleFor(client: Client): Role {
+    return this.seatColor(client) ?? 'spectator';
+  }
+
+  /** The recent chat history, oldest first -- replayed to a client on connect. */
+  chatHistory(): ChatMessage[] {
+    return [...this.chatLog];
+  }
+
+  /**
+   * Records a chat line from `client`, tagged with their current role. Rejects
+   * (returns null, nothing recorded) non-string, empty, or whitespace-only text;
+   * longer text is truncated to MAX_CHAT_LENGTH. The client JSON is untrusted, so
+   * this must never throw. Returns the stored message to broadcast on success.
+   */
+  chat(client: Client, text: unknown): ChatMessage | null {
+    if (typeof text !== 'string') return null;
+    const trimmed = text.trim();
+    if (trimmed.length === 0) return null;
+    const message: ChatMessage = {
+      id: this.nextChatId++,
+      from: this.roleFor(client),
+      text: trimmed.slice(0, MAX_CHAT_LENGTH),
+    };
+    this.chatLog.push(message);
+    if (this.chatLog.length > CHAT_HISTORY_LIMIT) this.chatLog.shift();
+    return message;
   }
 
   /** Seats a newly-connected client: Red if free, else Black, else spectator. */

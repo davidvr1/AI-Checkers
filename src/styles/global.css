@@ -509,6 +509,108 @@ hr.rule {
   margin-top: var(--space-xs);
 }
 
+/* Right-hand column in online mode: scoreboard rail stacked over the chat. */
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.chat {
+  width: 240px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-lg);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.chat-title {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.chat-messages {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  height: 180px;
+  overflow-y: auto;
+}
+
+.chat-empty {
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+.chat-msg {
+  font-size: 13.5px;
+  line-height: 1.35;
+}
+
+.chat-from {
+  font-weight: 700;
+  margin-inline-end: 6px;
+}
+
+.chat-msg.from-red .chat-from {
+  color: var(--garnet);
+}
+.chat-msg.from-black .chat-from {
+  color: var(--text);
+}
+.chat-msg.from-spectator .chat-from {
+  color: var(--text-dim);
+}
+
+.chat-text {
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.chat-input {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.chat-input input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--panel-border);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 13.5px;
+}
+
+.chat-input input:focus {
+  outline: none;
+  border-color: var(--brass);
+}
+
+.chat-input button {
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  border: none;
+  background: var(--brass);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.chat-input button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .setup-start.rematch {
   margin-top: 0;
   padding: 8px 16px;
