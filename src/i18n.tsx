@@ -51,6 +51,13 @@ export interface Translations {
     send: string;
     empty: string;
   };
+  video: {
+    title: string;
+    turnOn: string;
+    turnOff: string;
+    waitingOpponent: string;
+    errors: { denied: string; 'no-device': string; unsupported: string; failed: string };
+  };
   status: {
     toMove: string;
     gameOver: string;
@@ -109,6 +116,18 @@ const en: Translations = {
     send: 'Send',
     empty: 'No messages yet — say hello!',
   },
+  video: {
+    title: 'Video',
+    turnOn: 'Turn on camera',
+    turnOff: 'Turn off camera',
+    waitingOpponent: "Waiting for your opponent's camera…",
+    errors: {
+      denied: 'Camera permission was denied. Allow it in your browser and try again.',
+      'no-device': 'No camera was found on this device.',
+      unsupported: 'Camera is not available here (a secure HTTPS connection is required).',
+      failed: 'The camera could not be started.',
+    },
+  },
   status: {
     toMove: 'To move',
     gameOver: 'Game over',
@@ -166,6 +185,18 @@ const he: Translations = {
     placeholder: 'כתוב הודעה…',
     send: 'שלח',
     empty: 'אין הודעות עדיין — תגיד שלום!',
+  },
+  video: {
+    title: 'וידאו',
+    turnOn: 'הפעל מצלמה',
+    turnOff: 'כבה מצלמה',
+    waitingOpponent: 'ממתין למצלמת היריב…',
+    errors: {
+      denied: 'ההרשאה למצלמה נדחתה. אשר אותה בדפדפן ונסה שוב.',
+      'no-device': 'לא נמצאה מצלמה במכשיר הזה.',
+      unsupported: 'המצלמה אינה זמינה כאן (נדרש חיבור מאובטח HTTPS).',
+      failed: 'לא ניתן להפעיל את המצלמה.',
+    },
   },
   status: {
     toMove: 'תור',

@@ -29,6 +29,12 @@ export interface OnlineGame {
   onSelectSquare: (position: Position) => void;
   sendChat: (text: string) => void;
   reset: () => void;
+  /** Send an opaque WebRTC signaling payload to the other player (video). */
+  sendSignal: (data: unknown) => void;
+  /** Register a handler for signaling relayed from the other player. Returns an
+   *  unsubscribe. Each incoming signal is delivered synchronously (not via React
+   *  state) so rapid ICE candidates are never coalesced/lost. */
+  onSignal: (handler: (from: Role, data: unknown) => void) => () => void;
 }
 
 /** Longest backoff between reconnect attempts (ms). */
@@ -86,6 +92,7 @@ export function useOnlineGame(): OnlineGame {
   const [chat, setChat] = useState<ChatMessage[]>([]);
   const socketRef = useRef<WebSocket | null>(null);
   const pendingTimer = useRef<ReturnType<typeof setTimeout>>();
+  const signalHandlerRef = useRef<((from: Role, data: unknown) => void) | null>(null);
 
   useEffect(() => {
     const url = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}${WS_PATH}`;
@@ -124,6 +131,10 @@ export function useOnlineGame(): OnlineGame {
             const added = message.messages.filter((m) => !seen.has(m.id));
             return added.length ? [...prev, ...added] : prev;
           });
+        } else if (message.type === 'signal') {
+          // Deliver straight to the video hook's handler (no React state, so a
+          // burst of ICE candidates in one tick isn't batched down to the last).
+          signalHandlerRef.current?.(message.from, message.data);
         }
       };
       socket.onerror = () => socket.close(); // fall through to onclose's retry
@@ -200,5 +211,27 @@ export function useOnlineGame(): OnlineGame {
     [send],
   );
 
-  return { status, role, state, players, selected, myTurn, pending, chat, onSelectSquare, sendChat, reset };
+  const sendSignal = useCallback((data: unknown) => send({ type: 'signal', data }), [send]);
+  const onSignal = useCallback((handler: (from: Role, data: unknown) => void) => {
+    signalHandlerRef.current = handler;
+    return () => {
+      if (signalHandlerRef.current === handler) signalHandlerRef.current = null;
+    };
+  }, []);
+
+  return {
+    status,
+    role,
+    state,
+    players,
+    selected,
+    myTurn,
+    pending,
+    chat,
+    onSelectSquare,
+    sendChat,
+    reset,
+    sendSignal,
+    onSignal,
+  };
 }

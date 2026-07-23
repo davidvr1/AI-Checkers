@@ -1,5 +1,6 @@
 # Run the checkers server in one command:  docker compose up -d --build
-# Then open http://<this-machine's-LAN-IP>:4173 on any device on the same network.
+# Then open https://<this-machine's-LAN-IP>:4173 on any device on the same network
+# (HTTPS with a self-signed cert -> one-time "not private" warning to click through).
 services:
   checkers:
     build: .

@@ -124,6 +124,42 @@ describe('GameRoom: reset', () => {
   });
 });
 
+describe('GameRoom: signaling peers (opponentOf / roleFor)', () => {
+  it('pairs the two seated players as each other opponents', () => {
+    const room = new GameRoom<string>();
+    room.join('a'); // red
+    room.join('b'); // black
+    expect(room.roleFor('a')).toBe('red');
+    expect(room.roleFor('b')).toBe('black');
+    expect(room.opponentOf('a')).toBe('b');
+    expect(room.opponentOf('b')).toBe('a');
+  });
+
+  it('has no signaling peer for a spectator or an unseated client', () => {
+    const room = new GameRoom<string>();
+    room.join('a');
+    room.join('b');
+    room.join('c'); // spectator
+    expect(room.roleFor('c')).toBe('spectator');
+    expect(room.opponentOf('c')).toBeNull();
+    expect(room.opponentOf('zzz')).toBeNull(); // never joined
+  });
+
+  it('has no opponent while only one seat is filled', () => {
+    const room = new GameRoom<string>();
+    room.join('a'); // red only
+    expect(room.opponentOf('a')).toBeNull();
+  });
+
+  it('drops the opponent link when the other player leaves', () => {
+    const room = new GameRoom<string>();
+    room.join('a');
+    room.join('b');
+    room.leave('b');
+    expect(room.opponentOf('a')).toBeNull();
+  });
+});
+
 describe('GameRoom: chat', () => {
   it('tags each message with the sender role and assigns increasing ids', () => {
     const room = new GameRoom<string>();

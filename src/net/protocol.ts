@@ -24,7 +24,11 @@ export interface ChatMessage {
 export type ClientMessage =
   | { type: 'move'; move: Move }
   | { type: 'reset' }
-  | { type: 'chat'; text: string };
+  | { type: 'chat'; text: string }
+  // WebRTC signaling (SDP offer/answer or an ICE candidate) for the video feature.
+  // `data` is an opaque payload the server relays verbatim to the OTHER player --
+  // the server never inspects it; the video is peer-to-peer, not through the server.
+  | { type: 'signal'; data: unknown };
 
 /**
  * Messages the server sends to the browser. `welcome` arrives once on connect and
@@ -38,4 +42,6 @@ export type ServerMessage =
   | { type: 'sync'; state: GameState; players: PlayerPresence }
   // Carries the recent history on connect, then one appended message per chat.
   // The client appends `messages` in both cases.
-  | { type: 'chat'; messages: ChatMessage[] };
+  | { type: 'chat'; messages: ChatMessage[] }
+  // A signaling payload relayed from the other player (`from`), for WebRTC video.
+  | { type: 'signal'; from: Role; data: unknown };

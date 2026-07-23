@@ -1,9 +1,10 @@
-import { createServer } from 'node:http';
+import { createServer as createHttpsServer } from 'node:https';
 import { networkInterfaces } from 'node:os';
 import { dirname, join } from 'node:path';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
+import selfsigned from 'selfsigned';
 import { WebSocketServer, type WebSocket } from 'ws';
 import { GameRoom } from '../src/net/gameRoom';
 import { WS_PATH, type ClientMessage, type ServerMessage } from '../src/net/protocol';
@@ -11,6 +12,66 @@ import { WS_PATH, type ClientMessage, type ServerMessage } from '../src/net/prot
 const PORT = Number(process.env.PORT ?? 4173);
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const distDir = join(__dirname, '..', 'dist');
+
+// Registered up front (before the top-level `await` below) so nothing a client
+// sends -- and no async startup hiccup -- can take the process down uncaught.
+process.on('uncaughtException', (err) => console.error('[server] uncaught exception (kept alive):', err));
+process.on('unhandledRejection', (err) => console.error('[server] unhandled rejection (kept alive):', err));
+
+/** All non-internal IPv4 addresses of this host (its LAN addresses). */
+function lanIPv4s(): string[] {
+  const ips: string[] = [];
+  for (const addrs of Object.values(networkInterfaces())) {
+    for (const addr of addrs ?? []) {
+      if (addr.family === 'IPv4' && !addr.internal) ips.push(addr.address);
+    }
+  }
+  return ips;
+}
+
+/**
+ * TLS material for the HTTPS server. The app is served over HTTPS because
+ * browsers only grant camera access (getUserMedia, for the video feature) on a
+ * secure origin. A real cert can be supplied via TLS_CERT_FILE/TLS_KEY_FILE
+ * (e.g. mkcert, to avoid the browser warning); otherwise a self-signed cert is
+ * generated in memory, valid for localhost and this host's LAN IPs -- browsers
+ * will still show a one-time "not trusted" warning to click through on a LAN.
+ */
+async function loadTls(): Promise<{ cert: string | Buffer; key: string | Buffer; selfSigned: boolean }> {
+  const certFile = process.env.TLS_CERT_FILE;
+  const keyFile = process.env.TLS_KEY_FILE;
+  if (certFile || keyFile) {
+    if (certFile && keyFile) {
+      try {
+        return { cert: readFileSync(certFile), key: readFileSync(keyFile), selfSigned: false };
+      } catch (err) {
+        // Never crash on a bad path -- fall back to self-signed with a clear note.
+        console.error(
+          `[server] could not read TLS_CERT_FILE/TLS_KEY_FILE (${(err as Error).message}); using a self-signed certificate instead.`,
+        );
+      }
+    } else {
+      console.warn(
+        '[server] both TLS_CERT_FILE and TLS_KEY_FILE are required for a custom certificate; using a self-signed one.',
+      );
+    }
+  }
+  const pems = await selfsigned.generate([{ name: 'commonName', value: 'checkers.local' }], {
+    keySize: 2048,
+    algorithm: 'sha256',
+    extensions: [
+      {
+        name: 'subjectAltName',
+        altNames: [
+          { type: 2 as const, value: 'localhost' },
+          { type: 7 as const, ip: '127.0.0.1' },
+          ...lanIPv4s().map((ip) => ({ type: 7 as const, ip })),
+        ],
+      },
+    ],
+  });
+  return { cert: pems.cert, key: pems.private, selfSigned: true };
+}
 
 // One shared match for the whole server (a home-WiFi, two-player scenario). All
 // authoritative game/seat logic lives in GameRoom -- this file is just the
@@ -52,10 +113,11 @@ if (existsSync(distDir)) {
   );
 }
 
-const httpServer = createServer(app);
-// maxPayload caps a single frame at 64 KB -- a move/reset is tiny, so this just
-// denies an unauthenticated LAN client an easy memory-pressure lever.
-const wss = new WebSocketServer({ server: httpServer, path: WS_PATH, maxPayload: 64 * 1024 });
+const tls = await loadTls();
+const httpsServer = createHttpsServer({ cert: tls.cert, key: tls.key }, app);
+// maxPayload caps a single frame at 64 KB. Signaling frames (SDP/ICE) are the
+// largest legitimate payload but stay well under this; a move/chat is tiny.
+const wss = new WebSocketServer({ server: httpsServer, path: WS_PATH, maxPayload: 64 * 1024 });
 
 // Liveness sockets that die without a clean TCP close (a phone leaving WiFi, iOS
 // suspending the tab) would otherwise hold their seat forever. We ping every
@@ -98,6 +160,12 @@ wss.on('connection', (socket) => {
         }
         return;
       }
+      if (message.type === 'signal') {
+        // Relay opaque WebRTC signaling to the other player only (video is P2P).
+        const opponent = room.opponentOf(socket);
+        if (opponent) send(opponent, { type: 'signal', from: room.roleFor(socket), data: message.data });
+        return;
+      }
       const changed =
         message.type === 'move'
           ? room.move(socket, message.move)
@@ -120,38 +188,29 @@ wss.on('connection', (socket) => {
   socket.on('error', () => socket.close());
 });
 
-// Last-resort guard: nothing a client can send should take the server down.
-process.on('uncaughtException', (err) => {
-  console.error('[server] uncaught exception (kept alive):', err);
-});
-
-function lanUrls(): string[] {
-  const urls: string[] = [];
-  for (const addrs of Object.values(networkInterfaces())) {
-    for (const addr of addrs ?? []) {
-      if (addr.family === 'IPv4' && !addr.internal) urls.push(`http://${addr.address}:${PORT}`);
-    }
-  }
-  return urls;
-}
-
-httpServer.listen(PORT, '0.0.0.0', () => {
-  console.log(`\n  Checkers online is running on port ${PORT}.\n`);
+httpsServer.listen(PORT, '0.0.0.0', () => {
+  console.log(`\n  Checkers online is running (HTTPS) on port ${PORT}.\n`);
   if (process.env.RUNNING_IN_DOCKER) {
     // Inside a container, os.networkInterfaces() reports the container's private
     // IPs, which no other device can reach. Point users at the host instead.
-    console.log(`  On this computer:      http://localhost:${PORT}`);
-    console.log('  On other devices:      http://<THIS-MACHINE-LAN-IP>:' + PORT);
+    console.log(`  On this computer:      https://localhost:${PORT}`);
+    console.log('  On other devices:      https://<THIS-MACHINE-LAN-IP>:' + PORT);
     console.log('                         (run `ipconfig` / `ip addr` on the host to find its LAN IP)');
   } else {
-    const urls = lanUrls();
-    console.log(`  On this computer:      http://localhost:${PORT}`);
-    if (urls.length > 0) {
+    const ips = lanIPv4s();
+    console.log(`  On this computer:      https://localhost:${PORT}`);
+    if (ips.length > 0) {
       console.log('  On other WiFi devices:');
-      for (const url of urls) console.log(`                         ${url}`);
+      for (const ip of ips) console.log(`                         https://${ip}:${PORT}`);
     } else {
       console.log('  (No LAN IPv4 address found -- are you connected to WiFi?)');
     }
   }
-  console.log('\n  First device to open it plays Red, second plays Black. Others watch.\n');
+  console.log('\n  First device to open it plays Red, second plays Black. Others watch.');
+  if (tls.selfSigned) {
+    console.log('\n  NOTE: using a self-signed certificate, so each device shows a one-time');
+    console.log('  "your connection is not private" warning -- click Advanced -> Proceed.');
+    console.log('  (HTTPS is required for the camera feature to work.)');
+  }
+  console.log('');
 });
