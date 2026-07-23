@@ -8,10 +8,13 @@ export interface VideoState {
   /** True only for a seated player on a browser that supports WebRTC + camera. */
   available: boolean;
   cameraOn: boolean;
+  /** Whether this client's microphone is live (only meaningful while cameraOn). */
+  micOn: boolean;
   localStream: MediaStream | null;
   remoteStream: MediaStream | null;
   error: VideoError | null;
   toggleCamera: () => void;
+  toggleMic: () => void;
 }
 
 interface UseVideoParams {
@@ -46,6 +49,7 @@ const supported = (): boolean =>
  */
 export function useVideo({ role, opponentPresent, status, sendSignal, onSignal }: UseVideoParams): VideoState {
   const [cameraOn, setCameraOn] = useState(false);
+  const [micOn, setMicOn] = useState(true);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
   const [error, setError] = useState<VideoError | null>(null);
@@ -193,10 +197,16 @@ export function useVideo({ role, opponentPresent, status, sendSignal, onSignal }
     }
     setError(null);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      // Audio with echo cancellation so speaker output isn't fed back into the
+      // mic (the self-view <video> is muted, so no local feedback either).
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      });
       localStreamRef.current = stream;
       setLocalStream(stream);
       setCameraOn(true);
+      setMicOn(true);
       // Add tracks to an already-open peer (opponent present) -> renegotiation ->
       // offer. If there's no peer yet (still waiting), ensurePc will attach these
       // tracks when it creates the peer on the opponent's arrival. NOTE: we do NOT
@@ -227,6 +237,18 @@ export function useVideo({ role, opponentPresent, status, sendSignal, onSignal }
     else void startCamera();
   }, [cameraOn, startCamera, stopCamera]);
 
+  // Mute/unmute the mic by toggling the audio track's `enabled` -- the opponent
+  // hears silence with no renegotiation, and the track is kept ready to unmute.
+  const toggleMic = useCallback(() => {
+    const stream = localStreamRef.current;
+    if (!stream) return;
+    setMicOn((prev) => {
+      const next = !prev;
+      for (const track of stream.getAudioTracks()) track.enabled = next;
+      return next;
+    });
+  }, []);
+
   // Stop the camera and close the peer on unmount (leaving the online screen).
   useEffect(
     () => () => {
@@ -236,5 +258,5 @@ export function useVideo({ role, opponentPresent, status, sendSignal, onSignal }
     [],
   );
 
-  return { available, cameraOn, localStream, remoteStream, error, toggleCamera };
+  return { available, cameraOn, micOn, localStream, remoteStream, error, toggleCamera, toggleMic };
 }

@@ -55,6 +55,8 @@ export interface Translations {
     title: string;
     turnOn: string;
     turnOff: string;
+    mute: string;
+    unmute: string;
     waitingOpponent: string;
     errors: { denied: string; 'no-device': string; unsupported: string; failed: string };
   };
@@ -120,9 +122,11 @@ const en: Translations = {
     title: 'Video',
     turnOn: 'Turn on camera',
     turnOff: 'Turn off camera',
+    mute: 'Mute mic',
+    unmute: 'Unmute mic',
     waitingOpponent: "Waiting for your opponent's camera…",
     errors: {
-      denied: 'Camera permission was denied. Allow it in your browser and try again.',
+      denied: 'Camera/microphone permission was denied. Allow it in your browser and try again.',
       'no-device': 'No camera was found on this device.',
       unsupported: 'Camera is not available here (a secure HTTPS connection is required).',
       failed: 'The camera could not be started.',
@@ -190,9 +194,11 @@ const he: Translations = {
     title: 'וידאו',
     turnOn: 'הפעל מצלמה',
     turnOff: 'כבה מצלמה',
+    mute: 'השתק מיקרופון',
+    unmute: 'בטל השתקה',
     waitingOpponent: 'ממתין למצלמת היריב…',
     errors: {
-      denied: 'ההרשאה למצלמה נדחתה. אשר אותה בדפדפן ונסה שוב.',
+      denied: 'ההרשאה למצלמה/מיקרופון נדחתה. אשר אותה בדפדפן ונסה שוב.',
       'no-device': 'לא נמצאה מצלמה במכשיר הזה.',
       unsupported: 'המצלמה אינה זמינה כאן (נדרש חיבור מאובטח HTTPS).',
       failed: 'לא ניתן להפעיל את המצלמה.',

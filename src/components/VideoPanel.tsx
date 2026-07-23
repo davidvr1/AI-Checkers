@@ -34,9 +34,16 @@ export function VideoPanel({ video }: { video: VideoState }) {
         )}
       </div>
       {video.error && <div className="video-error">{t.video.errors[video.error]}</div>}
-      <button type="button" className="video-toggle" onClick={video.toggleCamera}>
-        {video.cameraOn ? t.video.turnOff : t.video.turnOn}
-      </button>
+      <div className="video-controls">
+        <button type="button" className="video-toggle" onClick={video.toggleCamera}>
+          {video.cameraOn ? t.video.turnOff : t.video.turnOn}
+        </button>
+        {video.cameraOn && (
+          <button type="button" className="video-toggle" onClick={video.toggleMic}>
+            {video.micOn ? t.video.mute : t.video.unmute}
+          </button>
+        )}
+      </div>
     </div>
   );
 }
