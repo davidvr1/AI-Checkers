@@ -16,7 +16,9 @@ export function GameSetup({ onStart }: GameSetupProps) {
   const [difficulty, setDifficulty] = useState<Difficulty>('medium');
 
   const handleStart = () => {
-    onStart(mode === 'human' ? { mode: 'human' } : { mode: 'ai', humanColor, difficulty });
+    if (mode === 'human') onStart({ mode: 'human' });
+    else if (mode === 'online') onStart({ mode: 'online' });
+    else onStart({ mode: 'ai', humanColor, difficulty });
   };
 
   return (
@@ -47,8 +49,18 @@ export function GameSetup({ onStart }: GameSetupProps) {
             >
               {t.setup.vsAi}
             </button>
+            <button
+              type="button"
+              aria-pressed={mode === 'online'}
+              className={`setup-option ${mode === 'online' ? 'active' : ''}`}
+              onClick={() => setMode('online')}
+            >
+              {t.setup.playOnline}
+            </button>
           </div>
         </div>
+
+        {mode === 'online' && <p className="setup-hint">{t.setup.onlineHint}</p>}
 
         {mode === 'ai' && (
           <>
