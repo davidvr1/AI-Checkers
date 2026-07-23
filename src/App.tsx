@@ -1,6 +1,7 @@
 import { useEffect, useReducer, useRef, useState } from 'react';
 import { chooseAiMove, DIFFICULTY_DEPTH } from './ai/minimax';
 import { Board } from './components/Board';
+import { Fireworks } from './components/Fireworks';
 import { GameSetup } from './components/GameSetup';
 import { LanguageToggle } from './components/LanguageToggle';
 import { OnlineGameScreen } from './components/OnlineGameScreen';
@@ -86,8 +87,14 @@ function GameScreen({ config, onNewGame }: GameScreenProps) {
   const opponentLabel =
     config.mode === 'human' ? t.status.vsHuman : t.status.vsAiWith(t.difficulties[config.difficulty]);
 
+  // Celebrate a win: on a shared screen whoever won is "the winner"; against the
+  // AI, only when the human actually beat it.
+  const winner = state.status.type === 'won' ? state.status.winner : null;
+  const celebrate = winner !== null && (config.mode === 'human' || winner === config.humanColor);
+
   return (
     <>
+      <Fireworks active={celebrate} />
       <div className="masthead">
         <span className="eyebrow">
           {config.mode === 'human' ? t.masthead.localTwoPlayer : t.masthead.humanVsAi}
