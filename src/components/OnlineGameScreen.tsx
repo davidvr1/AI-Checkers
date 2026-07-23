@@ -68,6 +68,12 @@ export function OnlineGameScreen({ onNewGame }: OnlineGameScreenProps) {
       </div>
 
       <div className="program">
+        {/* Video + chat on one side of the board; the scoreboard rail on the other. */}
+        <div className="side">
+          <VideoPanel video={video} />
+          <Chat messages={chat} onSend={sendChat} ownRole={role} disabled={status !== 'open'} />
+        </div>
+
         {/* Board pinned LTR so it never mirrors under Hebrew RTL. Rendered from the
             server's authoritative state, with this client's local selection injected
             for highlighting. Disabled unless it is genuinely this client's turn. */}
@@ -84,12 +90,11 @@ export function OnlineGameScreen({ onNewGame }: OnlineGameScreenProps) {
             </div>
           )}
         </div>
+
         <div className="side">
           {/* aiThinking stays false here -- it would mislabel the human opponent as
               "AI is thinking". The online banner already conveys whose turn it is. */}
           {state && <StatusBar state={state} opponentLabel={opponentLabel} aiThinking={false} />}
-          <VideoPanel video={video} />
-          <Chat messages={chat} onSend={sendChat} ownRole={role} disabled={status !== 'open'} />
         </div>
       </div>
     </>

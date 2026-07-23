@@ -57,6 +57,8 @@ export interface Translations {
     turnOff: string;
     mute: string;
     unmute: string;
+    enlarge: string;
+    shrink: string;
     waitingOpponent: string;
     connecting: string;
     connectFailed: string;
@@ -126,6 +128,8 @@ const en: Translations = {
     turnOff: 'Turn off camera',
     mute: 'Mute mic',
     unmute: 'Unmute mic',
+    enlarge: 'Enlarge video',
+    shrink: 'Exit full screen',
     waitingOpponent: "Waiting for your opponent's camera…",
     connecting: 'Connecting to your opponent…',
     connectFailed:
@@ -201,6 +205,8 @@ const he: Translations = {
     turnOff: 'כבה מצלמה',
     mute: 'השתק מיקרופון',
     unmute: 'בטל השתקה',
+    enlarge: 'הגדל וידאו',
+    shrink: 'צא ממסך מלא',
     waitingOpponent: 'ממתין למצלמת היריב…',
     connecting: 'מתחבר ליריב…',
     connectFailed:
