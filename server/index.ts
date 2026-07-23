@@ -127,14 +127,22 @@ function lanUrls(): string[] {
 }
 
 httpServer.listen(PORT, '0.0.0.0', () => {
-  const urls = lanUrls();
   console.log(`\n  Checkers online is running on port ${PORT}.\n`);
-  console.log(`  On this computer:      http://localhost:${PORT}`);
-  if (urls.length > 0) {
-    console.log('  On other WiFi devices:');
-    for (const url of urls) console.log(`                         ${url}`);
+  if (process.env.RUNNING_IN_DOCKER) {
+    // Inside a container, os.networkInterfaces() reports the container's private
+    // IPs, which no other device can reach. Point users at the host instead.
+    console.log(`  On this computer:      http://localhost:${PORT}`);
+    console.log('  On other devices:      http://<THIS-MACHINE-LAN-IP>:' + PORT);
+    console.log('                         (run `ipconfig` / `ip addr` on the host to find its LAN IP)');
   } else {
-    console.log('  (No LAN IPv4 address found -- are you connected to WiFi?)');
+    const urls = lanUrls();
+    console.log(`  On this computer:      http://localhost:${PORT}`);
+    if (urls.length > 0) {
+      console.log('  On other WiFi devices:');
+      for (const url of urls) console.log(`                         ${url}`);
+    } else {
+      console.log('  (No LAN IPv4 address found -- are you connected to WiFi?)');
+    }
   }
   console.log('\n  First device to open it plays Red, second plays Black. Others watch.\n');
 });
