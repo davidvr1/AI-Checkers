@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Board } from './Board';
 import { Chat } from './Chat';
+import { Fireworks } from './Fireworks';
 import { StatusBar } from './StatusBar';
 import { VideoPanel } from './VideoPanel';
 import { useLang } from '../i18n';
@@ -53,8 +54,13 @@ export function OnlineGameScreen({ code, onNewGame }: OnlineGameScreenProps) {
 
   const opponentLabel = seated && role ? t.online.youArePlaying(t.colors[role]) : t.online.eyebrow;
 
+  // Only the player who actually won gets the fireworks -- not the loser, and not
+  // spectators.
+  const celebrate = state?.status.type === 'won' && state.status.winner === role;
+
   return (
     <>
+      <Fireworks active={celebrate} />
       <div className="masthead">
         <span className="eyebrow">{t.online.eyebrow}</span>
         <h1>{t.appTitle}</h1>
