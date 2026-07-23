@@ -657,6 +657,11 @@ hr.rule {
   padding: 12px;
   color: var(--text-dim);
   font-size: 12.5px;
+  line-height: 1.4;
+}
+
+.video-hint.error {
+  color: #e7b3b3; /* readable garnet on the black video stage */
 }
 
 .video-local {

@@ -58,6 +58,8 @@ export interface Translations {
     mute: string;
     unmute: string;
     waitingOpponent: string;
+    connecting: string;
+    connectFailed: string;
     errors: { denied: string; 'no-device': string; unsupported: string; failed: string };
   };
   status: {
@@ -125,6 +127,9 @@ const en: Translations = {
     mute: 'Mute mic',
     unmute: 'Unmute mic',
     waitingOpponent: "Waiting for your opponent's camera…",
+    connecting: 'Connecting to your opponent…',
+    connectFailed:
+      "Couldn't connect to your opponent's video. Make sure you're both on the same WiFi — some networks (guest/public) block direct device-to-device connections.",
     errors: {
       denied: 'Camera/microphone permission was denied. Allow it in your browser and try again.',
       'no-device': 'No camera was found on this device.',
@@ -197,6 +202,9 @@ const he: Translations = {
     mute: 'השתק מיקרופון',
     unmute: 'בטל השתקה',
     waitingOpponent: 'ממתין למצלמת היריב…',
+    connecting: 'מתחבר ליריב…',
+    connectFailed:
+      'לא ניתן להתחבר לווידאו של היריב. ודאו ששניכם על אותה רשת WiFi — רשתות מסוימות (אורח/ציבורי) חוסמות חיבור ישיר בין מכשירים.',
     errors: {
       denied: 'ההרשאה למצלמה/מיקרופון נדחתה. אשר אותה בדפדפן ונסה שוב.',
       'no-device': 'לא נמצאה מצלמה במכשיר הזה.',

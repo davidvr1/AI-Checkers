@@ -12,6 +12,8 @@ export interface VideoState {
   micOn: boolean;
   localStream: MediaStream | null;
   remoteStream: MediaStream | null;
+  /** The peer connection's state, so the UI can show connecting/failed distinctly. */
+  connection: RTCPeerConnectionState | null;
   error: VideoError | null;
   toggleCamera: () => void;
   toggleMic: () => void;
@@ -38,8 +40,9 @@ const supported = (): boolean =>
  * only for signaling (SDP/ICE) -- the video itself flows browser-to-browser.
  * Implements the WebRTC "perfect negotiation" pattern so simultaneous offers
  * (both players enabling the camera at once) resolve without glare; Red is the
- * polite peer, Black the impolite one. Empty iceServers: on a shared LAN the
- * host/mDNS candidates connect directly, no STUN/TURN (or internet) needed.
+ * polite peer, Black the impolite one. STUN servers are configured (see
+ * createPeer) so the two browsers can find a working path on real home networks;
+ * a network that blocks direct device-to-device traffic would need a TURN relay.
  *
  * Invariants that guard against the lifecycle traps: a peer connection exists
  * ONLY during an active call (seated + opponent present); the camera is stopped
@@ -52,6 +55,7 @@ export function useVideo({ role, opponentPresent, status, sendSignal, onSignal }
   const [micOn, setMicOn] = useState(true);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const [connection, setConnection] = useState<RTCPeerConnectionState | null>(null);
   const [error, setError] = useState<VideoError | null>(null);
 
   const pcRef = useRef<RTCPeerConnection | null>(null);
@@ -71,7 +75,16 @@ export function useVideo({ role, opponentPresent, status, sendSignal, onSignal }
   }, [opponentPresent]);
 
   const createPeer = useCallback((): RTCPeerConnection => {
-    const pc = new RTCPeerConnection({ iceServers: [] });
+    // STUN helps the two browsers find a working path on real networks (many home
+    // routers won't connect two devices on host/mDNS candidates alone). It needs
+    // internet; if there's none, ICE still falls back to host candidates. For a
+    // network that blocks device-to-device entirely (guest WiFi / client
+    // isolation) a TURN relay would be required -- see deferred-work.
+    const pc = new RTCPeerConnection({
+      iceServers: [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }],
+    });
+    pc.oniceconnectionstatechange = () =>
+      console.debug('[video] iceConnectionState:', pc.iceConnectionState);
     pc.onnegotiationneeded = async () => {
       try {
         makingOffer.current = true;
@@ -88,11 +101,10 @@ export function useVideo({ role, opponentPresent, status, sendSignal, onSignal }
     };
     pc.ontrack = ({ streams }) => setRemoteStream(streams[0] ?? null);
     pc.onconnectionstatechange = () => {
+      console.debug('[video] connectionState:', pc.connectionState);
+      setConnection(pc.connectionState);
       if (pc.connectionState === 'failed') {
-        setError('failed');
         pc.restartIce(); // best-effort recovery (won't help true unreachability, e.g. AP isolation)
-      } else if (pc.connectionState === 'connected') {
-        setError(null);
       }
     };
     return pc;
@@ -117,6 +129,7 @@ export function useVideo({ role, opponentPresent, status, sendSignal, onSignal }
     ignoreOffer.current = false;
     signalQueue.current = Promise.resolve();
     setRemoteStream(null);
+    setConnection(null);
   }, []);
 
   const releaseCamera = useCallback(() => {
@@ -258,5 +271,5 @@ export function useVideo({ role, opponentPresent, status, sendSignal, onSignal }
     [],
   );
 
-  return { available, cameraOn, micOn, localStream, remoteStream, error, toggleCamera, toggleMic };
+  return { available, cameraOn, micOn, localStream, remoteStream, connection, error, toggleCamera, toggleMic };
 }
