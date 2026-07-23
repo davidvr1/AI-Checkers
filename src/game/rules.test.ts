@@ -115,16 +115,23 @@ describe('promotion', () => {
     expect(nextBoard[0][3]).toEqual({ color: 'red', kind: 'king' });
   });
 
-  it('lets a man capture backward (standard draughts rule)', () => {
+  it('does NOT let a man capture backward (house rule: men capture forward only)', () => {
     let board = createEmptyBoard();
-    // Red men only advance toward row 0, but must still be able to capture a
-    // piece sitting behind them (toward row 7).
+    // Red men advance toward row 0; a black man sits behind the red man (toward
+    // row 7). Under the forward-only house rule the red man may not jump it.
     board = place(board, { row: 3, col: 3 }, 'red', 'man');
     board = place(board, { row: 4, col: 4 }, 'black');
 
-    const moves = pieceCaptureMoves(board, { row: 3, col: 3 }, 'red');
-    expect(moves).toEqual([
-      { from: { row: 3, col: 3 }, to: { row: 5, col: 5 }, captured: { row: 4, col: 4 } },
+    expect(pieceCaptureMoves(board, { row: 3, col: 3 }, 'red')).toEqual([]);
+  });
+
+  it('lets a man capture forward over an adjacent enemy', () => {
+    let board = createEmptyBoard();
+    board = place(board, { row: 3, col: 3 }, 'red', 'man'); // forward is toward row 0
+    board = place(board, { row: 2, col: 2 }, 'black');
+
+    expect(pieceCaptureMoves(board, { row: 3, col: 3 }, 'red')).toEqual([
+      { from: { row: 3, col: 3 }, to: { row: 1, col: 1 }, captured: { row: 2, col: 2 } },
     ]);
   });
 
@@ -404,35 +411,47 @@ describe('flying kings: captures', () => {
   });
 });
 
-describe('a man may only capture an enemy king moving forward', () => {
-  it('allows a man to jump an enemy king in its forward direction', () => {
+describe('men capture forward only (house rule), regardless of the target piece', () => {
+  it('allows a man to jump an enemy man forward', () => {
     let board = createEmptyBoard();
     board = place(board, { row: 3, col: 3 }, 'red', 'man'); // forward is toward row 0
-    board = place(board, { row: 2, col: 2 }, 'black', 'king');
+    board = place(board, { row: 2, col: 2 }, 'black', 'man');
 
-    const moves = pieceCaptureMoves(board, { row: 3, col: 3 }, 'red');
-    expect(moves).toEqual([
+    expect(pieceCaptureMoves(board, { row: 3, col: 3 }, 'red')).toEqual([
       { from: { row: 3, col: 3 }, to: { row: 1, col: 1 }, captured: { row: 2, col: 2 } },
     ]);
   });
 
-  it('forbids a man from jumping an enemy king backward', () => {
+  it('allows a man to jump an enemy king forward', () => {
     let board = createEmptyBoard();
     board = place(board, { row: 3, col: 3 }, 'red', 'man'); // forward is toward row 0
-    board = place(board, { row: 4, col: 4 }, 'black', 'king'); // behind the man
+    board = place(board, { row: 2, col: 2 }, 'black', 'king');
 
-    const moves = pieceCaptureMoves(board, { row: 3, col: 3 }, 'red');
-    expect(moves).toEqual([]);
+    expect(pieceCaptureMoves(board, { row: 3, col: 3 }, 'red')).toEqual([
+      { from: { row: 3, col: 3 }, to: { row: 1, col: 1 }, captured: { row: 2, col: 2 } },
+    ]);
   });
 
-  it('still allows a man to jump an enemy MAN backward, unrestricted', () => {
-    let board = createEmptyBoard();
-    board = place(board, { row: 3, col: 3 }, 'red', 'man');
-    board = place(board, { row: 4, col: 4 }, 'black', 'man'); // behind the man
+  it('forbids a man from jumping backward -- whether the target is a man or a king', () => {
+    let manBehind = createEmptyBoard();
+    manBehind = place(manBehind, { row: 3, col: 3 }, 'red', 'man');
+    manBehind = place(manBehind, { row: 4, col: 4 }, 'black', 'man'); // behind the man
+    expect(pieceCaptureMoves(manBehind, { row: 3, col: 3 }, 'red')).toEqual([]);
 
-    const moves = pieceCaptureMoves(board, { row: 3, col: 3 }, 'red');
-    expect(moves).toEqual([
-      { from: { row: 3, col: 3 }, to: { row: 5, col: 5 }, captured: { row: 4, col: 4 } },
+    let kingBehind = createEmptyBoard();
+    kingBehind = place(kingBehind, { row: 3, col: 3 }, 'red', 'man');
+    kingBehind = place(kingBehind, { row: 4, col: 4 }, 'black', 'king'); // behind the man
+    expect(pieceCaptureMoves(kingBehind, { row: 3, col: 3 }, 'red')).toEqual([]);
+  });
+
+  it('applies symmetrically to black (whose forward is toward row 7)', () => {
+    let board = createEmptyBoard();
+    board = place(board, { row: 4, col: 4 }, 'black', 'man'); // black advances toward row 7
+    board = place(board, { row: 5, col: 5 }, 'red', 'man'); // forward target -> legal
+    board = place(board, { row: 3, col: 3 }, 'red', 'man'); // backward target -> illegal
+
+    expect(pieceCaptureMoves(board, { row: 4, col: 4 }, 'black')).toEqual([
+      { from: { row: 4, col: 4 }, to: { row: 6, col: 6 }, captured: { row: 5, col: 5 } },
     ]);
   });
 });
